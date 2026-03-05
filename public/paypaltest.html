@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Virtual Hospital Platform — PayPal Test Checkout</title>
+  <style>
+    :root { --bg:#0b1020; --card:#121936; --muted:#9aa3b2; --text:#e6ebf5; --acc:#7aa2ff; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji"; background:linear-gradient(180deg,#0b1020,#0b1020 30%,#0d1328); color:var(--text); }
+    header { padding: 24px; text-align:center; }
+    h1 { margin:0 0 6px; font-size: 24px; }
+    .sub { color: var(--muted); font-size: 14px; }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 16px; display:grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 900px) { .container { grid-template-columns: 1fr; } }
+
+    .card { background: var(--card); border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 18px; box-shadow: 0 10px 25px rgba(0,0,0,0.25); }
+    .card h2 { font-size: 18px; margin-top:0; }
+
+    label { display:block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    input[type="text"], input[type="number"], textarea, select { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); background: #0e1530; color: var(--text); outline: none; }
+    textarea { min-height: 80px; resize: vertical; }
+
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .row-3 { display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    .actions { display:flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+
+    button { appearance:none; border:1px solid rgba(122,162,255,0.35); background:#121c46; color:#e6ebf5; padding:10px 14px; border-radius: 12px; cursor:pointer; font-weight: 600; }
+    button.primary { background: linear-gradient(180deg,#2f6bff,#2756d6); border-color: transparent; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+
+    .kbd { background:#0e1530; border:1px solid rgba(255,255,255,0.1); padding:2px 6px; border-radius:6px; font-size:12px; }
+
+    #paypal-buttons { padding: 8px; background: #0d1634; border:1px dashed rgba(255,255,255,0.1); border-radius:12px; min-height: 46px; display:flex; align-items:center; justify-content:center; }
+
+    .log { background:#0d142e; border:1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; max-height: 420px; overflow:auto; white-space: pre-wrap; }
+    .muted { color: var(--muted); }
+    .tag { font-size: 11px; padding:2px 6px; border-radius: 999px; border:1px solid rgba(255,255,255,0.12); }
+    .ok { color:#9cffd5; }
+    .err { color:#ff8e8e; }
+
+    footer { text-align:center; padding: 20px; color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Virtual Hospital Platform — PayPal Test Checkout</h1>
+    <div class="sub">Quick sandbox page to drive your <span class="kbd">/api/payments/paypal</span> endpoints.</div>
+  </header>
+
+  <div class="container">
+    <!-- Config Card -->
+    <section class="card">
+      <h2>1) Configuration</h2>
+      <div class="row">
+        <div>
+          <label for="clientId">PayPal <strong>Client ID</strong> (Sandbox)</label>
+          <input id="clientId" type="text" placeholder="AcdEfGhIjKlMn..." />
+        </div>
+        <div>
+          <label for="currency">Display Currency (SDK)</label>
+          <select id="currency">
+            <option>USD</option>
+            <option>EGP</option>
+            <option>EUR</option>
+            <option>GBP</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label for="baseUrl">API Base URL</label>
+          <input id="baseUrl" type="text" value="http://localhost:5000/api" />
+        </div>
+        <div>
+          <label for="makeDefault">Make PayPal method default on capture?</label>
+          <select id="makeDefault">
+            <option value="1" selected>Yes</option>
+            <option value="0">No</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label for="token">Authorization <span class="tag">Bearer JWT</span></label>
+        <textarea id="token" placeholder="Paste your Bearer token here..."></textarea>
+      </div>
+
+      <div class="actions">
+        <button class="primary" id="loadSdkBtn">Load PayPal SDK & Render Buttons</button>
+        <button id="clearSdkBtn">Remove SDK</button>
+      </div>
+      <div class="muted" style="margin-top:8px">Tip: Use your sandbox client id. Server must allow CORS if this file is opened from a different origin.</div>
+    </section>
+
+    <!-- Checkout Card -->
+    <section class="card">
+      <h2>2) Checkout Details</h2>
+      <div class="row-3">
+        <div>
+          <label for="amount">Amount</label>
+          <input id="amount" type="number" min="0" step="0.01" value="10.00" />
+        </div>
+        <div>
+          <label for="orderCurrency">Order Currency</label>
+          <select id="orderCurrency">
+            <option>USD</option>
+            <option>EGP</option>
+            <option>EUR</option>
+            <option>GBP</option>
+          </select>
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <div class="muted">(Server validates this — don't trust client in production)</div>
+        </div>
+      </div>
+      <div>
+        <label for="description">Description</label>
+        <input id="description" type="text" value="Virtual Hospital Platform test payment" />
+      </div>
+
+      <div style="margin-top:12px">
+        <div id="paypal-buttons"><span class="muted">PayPal Buttons will render here after loading the SDK</span></div>
+      </div>
+
+      <div class="actions">
+        <button id="createOrderBtn">Create Order (server)</button>
+        <button id="captureOrderBtn" disabled>Capture Last Order</button>
+      </div>
+    </section>
+
+    <!-- Logs -->
+    <section class="card" style="grid-column: 1 / -1;">
+      <h2>3) Console</h2>
+      <div id="console" class="log">Ready. Load SDK, then click the PayPal button to approve & capture.
+      </div>
+    </section>
+  </div>
+
+  <!-- SDK will be injected dynamically -->
+  <script>
+    const $ = (sel) => document.querySelector(sel);
+    const consoleEl = $('#console');
+    let lastOrderId = null;
+
+    // Helpers
+    function log(type, msg, obj) {
+      const time = new Date().toLocaleTimeString();
+      const color = type === 'ok' ? 'ok' : (type === 'err' ? 'err' : 'muted');
+      const line = document.createElement('div');
+      line.innerHTML = `<span class="${color}">[${time}]</span> ${msg}`;
+      consoleEl.appendChild(line);
+      if (obj) {
+        const pre = document.createElement('pre');
+        pre.textContent = JSON.stringify(obj, null, 2);
+        consoleEl.appendChild(pre);
+      }
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+
+    function getConfig() {
+      return {
+        clientId: $('#clientId').value.trim(),
+        sdkCurrency: $('#currency').value.trim() || 'USD',
+        baseUrl: $('#baseUrl').value.replace(/\/$/, ''),
+        token: $('#token').value.trim(),
+        makeDefault: $('#makeDefault').value === '1',
+        amount: ($('#amount').value || '10.00').toString(),
+        orderCurrency: $('#orderCurrency').value.trim() || 'USD',
+        description: $('#description').value.trim() || 'Virtual Hospital Platform payment'
+      };
+    }
+
+    function removeSdk() {
+      const old = document.getElementById('paypal-sdk');
+      if (old) old.remove();
+      // Remove global paypal reference (for safety when reloading SDK)
+      if (window.paypal) {
+        try { delete window.paypal; } catch(_) {}
+      }
+      $('#paypal-buttons').innerHTML = '<span class="muted">PayPal Buttons will render here after loading the SDK</span>';
+      log('muted', 'PayPal SDK removed.');
+    }
+
+    function loadSdkAndRender() {
+      const cfg = getConfig();
+      if (!cfg.clientId) { log('err','Client ID is required to load the SDK.'); return; }
+
+      removeSdk();
+
+      const script = document.createElement('script');
+      script.id = 'paypal-sdk';
+      script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(cfg.clientId)}&currency=${encodeURIComponent(cfg.sdkCurrency)}`;
+      script.onload = () => {
+        log('ok', 'PayPal SDK loaded. Rendering buttons…');
+        renderButtons();
+      };
+      script.onerror = () => log('err','Failed to load PayPal SDK. Check your client id & network.');
+      document.body.appendChild(script);
+    }
+
+    async function serverCreateOrder() {
+      const cfg = getConfig();
+      if (!cfg.token) { log('err','Bearer token is required.'); return; }
+      try {
+        const res = await fetch(`${cfg.baseUrl}/payments/paypal/create-order`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${cfg.token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ amount: cfg.amount, currency_code: cfg.orderCurrency, description: cfg.description })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Create order failed');
+        lastOrderId = data.id;
+        $('#captureOrderBtn').disabled = !lastOrderId;
+        log('ok', `Order created: ${data.id}`, data);
+        return data.id;
+      } catch (e) {
+        log('err', e.message);
+        throw e;
+      }
+    }
+
+    async function serverCaptureOrder(orderId) {
+      const cfg = getConfig();
+      if (!orderId) { log('err','No order id to capture.'); return; }
+      try {
+        const res = await fetch(`${cfg.baseUrl}/payments/paypal/capture-order/${orderId}?makeDefault=${cfg.makeDefault ? '1':'0'}`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${cfg.token}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Capture failed');
+        log('ok', `Order captured: ${orderId}`, data);
+        return data;
+      } catch (e) {
+        log('err', e.message);
+        throw e;
+      }
+    }
+
+    function renderButtons() {
+      if (!window.paypal) { log('err','paypal SDK not loaded'); return; }
+
+      $('#paypal-buttons').innerHTML = '';
+
+      window.paypal.Buttons({
+        createOrder: async () => {
+          return serverCreateOrder();
+        },
+        onApprove: async (data) => {
+          // data.orderID is provided by PayPal after user approval
+          return serverCaptureOrder(data.orderID);
+        },
+        onCancel: () => log('muted','Buyer canceled the PayPal popup.'),
+        onError: (err) => log('err', 'PayPal Buttons error', err)
+      }).render('#paypal-buttons');
+    }
+
+    // Wire up UI
+    document.getElementById('loadSdkBtn').addEventListener('click', loadSdkAndRender);
+    document.getElementById('clearSdkBtn').addEventListener('click', removeSdk);
+    document.getElementById('createOrderBtn').addEventListener('click', (e)=>{ e.preventDefault(); serverCreateOrder(); });
+    document.getElementById('captureOrderBtn').addEventListener('click', (e)=>{ e.preventDefault(); if(lastOrderId) serverCaptureOrder(lastOrderId); });
+
+    // Convenience: preload token from query string ?token=... (never do this in production)
+    const params = new URLSearchParams(location.search);
+    if (params.get('token')) { $('#token').value = params.get('token'); }
+  </script>
+</body>
+</html>

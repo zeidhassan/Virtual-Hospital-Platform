@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Suggested Questions (Admin)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link 
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" 
+    rel="stylesheet"
+  >
+  <style>
+    body {
+      padding: 2rem;
+    }
+    .badge-unapproved {
+      background-color: #ffc107;
+    }
+  </style>
+</head>
+
+<body>
+  <a id="backButton" class="btn btn-outline-primary mb-3">⬅ Back</a>
+  <h1 class="mb-4">Suggested Questions (Pending Approval)</h1>
+
+  <div class="mb-3">
+    <button class="btn btn-primary" onclick="fetchSuggestions()">Refresh</button>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-bordered table-hover">
+      <thead class="table-dark">
+        <tr>
+          <th>ID</th>
+          <th>Text</th>
+          <th>Type</th>
+          <th>Specialty</th>
+          <th>Suggested By</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="suggestedBody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const token = localStorage.getItem('token');
+    const role = localStorage.getItem('userRole');
+    const backBtn = document.getElementById('backButton');
+
+    // 🛡️ Access control check
+    if (!token || role !== 'admin') {
+      alert("Access denied. Admins only.");
+      window.location.href = "/unauthorized.html"; // or login page
+    }
+
+    // 🔁 Dynamic back button logic
+    backBtn.href = role === 'doctor' ? '/doctor-dashboard.html' : '/admin-dashboard.html';
+    backBtn.textContent = role === 'doctor' 
+      ? '⬅ Back to Doctor Dashboard' 
+      : '⬅ Back to Admin Dashboard';
+
+    // 🧠 Fetch and render suggestions
+    async function fetchSuggestions() {
+      try {
+        const res = await fetch('/api/admin/questions', {
+          headers: { Authorization: 'Bearer ' + token }
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error?.error || 'Access forbidden or unexpected error');
+        }
+
+        const all = await res.json();
+        if (!Array.isArray(all)) {
+          throw new Error("Unexpected response format");
+        }
+
+        const pending = all.filter(q => q.is_approved === false);
+        const body = document.getElementById('suggestedBody');
+        body.innerHTML = '';
+
+        pending.forEach(q => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${q.id}</td>
+            <td>${q.question_text}</td>
+            <td>${q.question_type}</td>
+            <td>${q.specialty || '-'}</td>
+            <td>${q.suggested_by || '-'}</td>
+            <td><span class="badge badge-unapproved">Pending</span></td>
+            <td>
+              <button class="btn btn-sm btn-success" onclick="approve(${q.id})">Approve</button>
+              <button class="btn btn-sm btn-danger" onclick="remove(${q.id})">Delete</button>
+            </td>
+          `;
+          body.appendChild(row);
+        });
+
+      } catch (err) {
+        console.error('[fetchSuggestions] Error:', err);
+        alert(err.message || 'Failed to fetch suggestions');
+      }
+    }
+
+    async function approve(id) {
+      if (!confirm('Approve this question?')) return;
+      try {
+        const res = await fetch(`/api/admin/questions/${id}/approve`, {
+          method: 'PUT',
+          headers: { Authorization: 'Bearer ' + token }
+        });
+        if (!res.ok) throw new Error('Approval failed');
+        alert('Approved!');
+        fetchSuggestions();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function remove(id) {
+      if (!confirm('Delete this question?')) return;
+      try {
+        const res = await fetch(`/api/admin/questions/${id}`, {
+          method: 'DELETE',
+          headers: { Authorization: 'Bearer ' + token }
+        });
+        if (!res.ok) throw new Error('Delete failed');
+        alert('Deleted');
+        fetchSuggestions();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // Initial call
+    fetchSuggestions();
+  </script>
+</body>
+</html>

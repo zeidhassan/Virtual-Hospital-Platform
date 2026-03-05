@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Manage Doctor Slots</title>
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+</head>
+<body class="p-4">
+  <h2>Doctor Time Slots</h2>
+  <a href="/admin-dashboard.html" class="btn btn-secondary mb-3">← Dashboard</a>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <label class="form-label">Doctor</label>
+      <select id="doctorSelect" class="form-select"></select>
+    </div>
+    <div class="col-md-2 d-grid">
+      <button id="refreshBtn" class="btn btn-info">Refresh</button>
+    </div>
+  </div>
+
+  <table class="table table-bordered" id="slotsTable">
+    <thead>
+      <tr><th>Day</th><th>Start</th><th>End</th><th>Action</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <form id="addSlotForm" class="row g-3">
+    <div class="col-md-3">
+      <label class="form-label">Day</label>
+      <select id="day_of_week" class="form-select" required>
+        <option disabled selected value="">Choose…</option>
+        <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
+        <option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Start Time</label>
+      <input id="start_time" type="time" class="form-control" required/>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">End Time</label>
+      <input id="end_time" type="time" class="form-control" required/>
+    </div>
+    <div class="col-md-3 d-grid">
+      <button class="btn btn-success">Add Slot</button>
+    </div>
+  </form>
+
+  <script>
+    const token = localStorage.getItem('token');
+    const doctorSelect = document.getElementById('doctorSelect');
+    const tableBody    = document.querySelector('#slotsTable tbody');
+    const form         = document.getElementById('addSlotForm');
+    const refreshBtn   = document.getElementById('refreshBtn');
+
+    async function fetchDoctors() {
+      const res = await fetch('/api/admin/doctor-slots?list_only=true', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const docs = await res.json();
+      doctorSelect.innerHTML = docs
+        .map(d => `<option value="${d.id}">${d.full_name}</option>`)
+        .join('');
+      if (docs[0]) loadSlots(docs[0].id);
+    }
+
+    async function loadSlots(docId) {
+      const res = await fetch(`/api/admin/doctor-slots?doctor_id=${docId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const slots = await res.json();
+      tableBody.innerHTML = slots.map(s => `
+        <tr>
+          <td>${s.day_of_week}</td>
+          <td>${s.start_time}</td>
+          <td>${s.end_time}</td>
+          <td>
+            <button class="btn btn-danger btn-sm" onclick="deleteSlot(${s.id})">
+              Delete
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function deleteSlot(id) {
+      if (!confirm('Delete?')) return;
+      await fetch(`/api/admin/doctor-slots/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      loadSlots(doctorSelect.value);
+    }
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const data = {
+        doctor_id:   doctorSelect.value,
+        day_of_week: form.day_of_week.value,
+        start_time:  form.start_time.value,
+        end_time:    form.end_time.value
+      };
+      await fetch('/api/admin/doctor-slots', {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          Authorization:    `Bearer ${token}`
+        },
+        body: JSON.stringify(data)
+      });
+      form.reset();
+      loadSlots(doctorSelect.value);
+    });
+
+    doctorSelect.addEventListener('change', () => loadSlots(doctorSelect.value));
+    refreshBtn.addEventListener('click', () => loadSlots(doctorSelect.value));
+
+    fetchDoctors();
+  </script>
+</body>
+</html>

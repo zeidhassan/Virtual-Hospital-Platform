@@ -1,0 +1,145 @@
+<!-- File: public/patient/view-submitted-answers.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>My Submitted Answers</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  >
+  <style>
+    body {
+      padding: 2rem;
+      background-color: #f0f4f8;
+    }
+    .container {
+      max-width: 900px;
+      background: #fff;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    .back-btn {
+      margin-bottom: 20px;
+    }
+    .response-card {
+      margin-bottom: 1.5rem;
+    }
+    .note {
+      background-color: #f9f9f9;
+      padding: 0.75rem;
+      border-left: 4px solid #0d6efd;
+      margin-top: 0.5rem;
+    }
+    .text-danger {
+      margin-top: 1rem;
+      color: #dc3545;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <button class="btn btn-secondary back-btn" onclick="goBack()">⬅️ Back to Dashboard</button>
+    <h2 class="mb-4">My Submitted Answers</h2>
+    <div id="responsesContainer"></div>
+  </div>
+
+  <script>
+    // 1) Grab the JWT from localStorage
+    const token = localStorage.getItem('token');
+    console.log("[DEBUG] Raw token:", token);
+
+    function goBack() {
+      window.location.href = '/patient-dashboard.html';
+    }
+
+    // 2) Decode JWT payload (to check role, if you want)
+    function decodeTokenPayload(token) {
+      try {
+        const payloadBase64 = token.split('.')[1];
+        const payloadJson = atob(payloadBase64);
+        const decoded = JSON.parse(payloadJson);
+        console.log("[DEBUG] Decoded token payload:", decoded);
+        return decoded;
+      } catch (err) {
+        console.error("[ERROR] Failed to decode token:", err);
+        return null;
+      }
+    }
+
+    // 3) Main loader: fetch “my‐responses” and render them
+    async function loadResponses() {
+      const container = document.getElementById('responsesContainer');
+      container.innerHTML = '<p>Loading responses...</p>';
+
+      // 3a) No token? force login
+      if (!token) {
+        alert("Unauthorized access. Please log in again.");
+        return window.location.href = "/login.html";
+      }
+
+      // 3b) Verify role is “patient”
+      const payload = decodeTokenPayload(token);
+      if (!payload || payload.role !== 'patient') {
+        alert("Unauthorized access. Please log in again.");
+        return window.location.href = "/login.html";
+      }
+
+      try {
+        // 4) Fetch the “my‐responses” endpoint directly
+        const res = await fetch(`/api/questions/my-responses`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        const data = await res.json();
+        console.log("[DEBUG] Answers API response:", data);
+
+        if (!res.ok) {
+          // If you get 403/404/500, show it on screen
+          throw new Error(data.error || 'Failed to load responses.');
+        }
+
+        // 5) Clear the “Loading…” placeholder
+        container.innerHTML = '';
+
+        // 6) If no answers, display “No answers submitted yet.”
+        if (!Array.isArray(data) || data.length === 0) {
+          container.innerHTML = '<p>No answers submitted yet.</p>';
+          return;
+        }
+
+        // 7) Otherwise, render each response as a card
+        data.forEach(resp => {
+          const card = document.createElement('div');
+          card.className = 'card response-card';
+          card.innerHTML = `
+            <div class="card-body">
+              <h5 class="card-title">${resp.question_text}</h5>
+              <p class="card-text"><strong>Your Answer:</strong> ${resp.answer}</p>
+              <p class="text-muted">
+                Submitted on: ${new Date(resp.created_at).toLocaleString()}
+              </p>
+              ${resp.note
+                ? `<div class="note"><strong>Doctor’s Note:</strong> ${resp.note}</div>`
+                : ''}
+            </div>
+          `;
+          container.appendChild(card);
+        });
+
+      } catch (err) {
+        // 8) On any error, show the red error message
+        container.innerHTML = `<p class="text-danger">Error: ${err.message}</p>`;
+        console.error("[ERROR] loadResponses:", err);
+      }
+    }
+
+    // 9) Run on page load
+    window.onload = loadResponses;
+  </script>
+</body>
+</html>

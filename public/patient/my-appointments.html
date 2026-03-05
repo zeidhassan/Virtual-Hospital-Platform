@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Appointments</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f8f9fa;
+      padding: 30px;
+    }
+
+    h2 {
+      text-align: center;
+      color: #333;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 30px;
+    }
+
+    th, td {
+      padding: 12px;
+      border-bottom: 1px solid #ddd;
+      text-align: center;
+    }
+
+    th {
+      background-color: #4A90E2;
+      color: white;
+    }
+
+    tr:hover {
+      background-color: #f1f1f1;
+    }
+
+    .status {
+      font-weight: bold;
+    }
+
+    .status.pending { color: orange; }
+    .status.confirmed { color: green; }
+    .status.cancelled { color: red; }
+
+    button.back {
+      display: block;
+      margin: 30px auto;
+      padding: 10px 20px;
+      background-color: #4A90E2;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .cancel-btn {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 6px;
+      background-color: #ff4d4d;
+      color: white;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h2>My Appointments</h2>
+  <table id="appointmentsTable">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Time</th>
+        <th>Doctor</th>
+        <th>Specialization</th>
+        <th>Status</th>
+        <th>Notes</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <button class="back" onclick="goBack()">⬅ Back to Dashboard</button>
+
+  <script>
+    function authHeaders() {
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + localStorage.getItem('token')
+      };
+    }
+
+    async function loadAppointments() {
+      const res = await fetch('/api/patient/appointments/my-appointments', {
+        headers: authHeaders()
+      });
+      const appointments = await res.json();
+
+      const tbody = document.querySelector('#appointmentsTable tbody');
+      tbody.innerHTML = '';
+
+      if (!Array.isArray(appointments)) {
+        tbody.innerHTML = '<tr><td colspan="7">Error loading appointments.</td></tr>';
+        return;
+      }
+
+      if (appointments.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7">You have no appointments.</td></tr>';
+        return;
+      }
+
+      appointments.forEach(app => {
+        const row = document.createElement('tr');
+
+        const date = document.createElement('td');
+        date.textContent = app.appointment_date;
+
+        const time = document.createElement('td');
+        time.textContent = `${app.appointment_start_time} - ${app.appointment_end_time}`;
+
+        const doctor = document.createElement('td');
+        doctor.textContent = app.doctor_name;
+
+        const specialization = document.createElement('td');
+        specialization.textContent = app.specialization;
+
+        const status = document.createElement('td');
+        status.textContent = app.status;
+        status.classList.add('status', app.status.toLowerCase());
+
+        const notes = document.createElement('td');
+        notes.textContent = app.notes || '-';
+
+        const actions = document.createElement('td');
+        if (app.status.toLowerCase() === 'pending') {
+          const cancelBtn = document.createElement('button');
+          cancelBtn.textContent = 'Cancel';
+          cancelBtn.className = 'cancel-btn';
+          cancelBtn.onclick = () => cancelAppointment(app.id);
+          actions.appendChild(cancelBtn);
+        } else {
+          actions.textContent = '-';
+        }
+
+        row.append(date, time, doctor, specialization, status, notes, actions);
+        tbody.appendChild(row);
+      });
+    }
+
+    async function cancelAppointment(appointmentId) {
+      if (!confirm('Are you sure you want to cancel this appointment?')) return;
+
+      const res = await fetch(`/api/patient/appointments/cancel/${appointmentId}`, {
+        method: 'PUT',
+        headers: authHeaders()
+      });
+
+      const result = await res.json();
+      alert(result.message || 'Appointment cancelled.');
+      loadAppointments();
+    }
+
+    function goBack() {
+      window.location.href = '../patient-dashboard.html';
+    }
+
+    window.onload = loadAppointments;
+  </script>
+</body>
+</html>

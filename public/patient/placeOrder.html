@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Place Pharmacy Order</title>
+  <style>
+    body {
+      font-family: Arial;
+      background: #f4f6f8;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 500px;
+      margin: auto;
+    }
+
+    form {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    label,
+    input,
+    select,
+    textarea {
+      display: block;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      background: #2c7a7b;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .back-btn {
+      margin-bottom: 20px;
+      background: #6c757d;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <button class="back-btn" onclick="goBack()">← Back to Dashboard</button>
+
+    <h2>Place a New Pharmacy Order</h2>
+    <form id="orderForm" enctype="multipart/form-data">
+      <label for="medications">Select Medications</label>
+      <select id="medications" name="medications" multiple required></select>
+
+      <label for="prescription_file">Prescription File (PDF, JPG, PNG)</label>
+      <input type="file" id="prescription_file" name="prescription_file" accept=".pdf,.jpg,.jpeg,.png" />
+
+      <button type="submit">Submit Order</button>
+    </form>
+  </div>
+
+  <script>
+    function goBack() {
+      const role = localStorage.getItem('userRole');
+      if (role === 'patient') {
+        window.location.href = '/patient-dashboard.html';
+      } else if (role === 'admin') {
+        window.location.href = '/admin-dashboard.html';
+      } else if (role === 'doctor') {
+        window.location.href = '/doctor-dashboard.html';
+      } else {
+        window.location.href = '/login.html';
+      }
+    }
+
+    async function loadMedications() {
+      const res = await fetch('/api/pharmacy-orders/medications/list', {
+        headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+      });
+      const meds = await res.json();
+      const select = document.getElementById('medications');
+      meds.forEach(med => {
+        const option = document.createElement('option');
+        option.value = med.name;
+        option.textContent = `${med.name} (${med.price} SAR)`;
+        select.appendChild(option);
+      });
+    }
+
+    document.getElementById('orderForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      // 1. Get selected medications and validate
+      const selected = Array.from(document.getElementById('medications').selectedOptions).map(opt => opt.value.trim());
+      if (selected.length === 0) {
+        alert('Please select at least one medication.');
+        return;
+      }
+
+      // 2. Build query string
+      const query = new URLSearchParams({ medications: selected.join(',') }).toString();
+
+      // 3. Prepare FormData for file (optional)
+      const formData = new FormData();
+      const file = document.getElementById('prescription_file').files[0];
+      if (file) formData.append('prescription_file', file);
+
+      try {
+        // 4. Send POST with query + file
+        const res = await fetch('/api/pharmacy-orders?' + query, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + localStorage.getItem('token')
+          },
+          body: formData
+        });
+
+        const data = await res.json();
+        alert(res.ok ? 'Order placed successfully!' : 'Error: ' + data.error);
+      } catch (err) {
+        console.error('Fetch error:', err);
+        alert('Failed to send request.');
+      }
+    });
+
+    loadMedications();
+  </script>
+
+</body>
+
+</html>

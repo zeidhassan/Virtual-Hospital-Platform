@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Patient Dashboard</title>
+  <style>
+    body {
+      background: #f4f6f8;
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .dashboard-box {
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    h1 {
+      margin-bottom: 20px;
+      color: #2c7a7b;
+    }
+    p {
+      margin-bottom: 30px;
+      color: #555;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      background: #2c7a7b;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-box">
+    <h1>Welcome, Patient</h1>
+    <button onclick="window.location.href='/patient/appointments.html'">Appointments</button>
+    <button onclick="window.location.href='/patient/medical-records.html'">Medical Records</button>
+    <button onclick="window.location.href='/patient/prescriptions.html'">Prescriptions</button>
+    <button onclick="window.location.href='/patient/book-appointments.html'">Book Appointments</button>
+    <button onclick="window.location.href='/patient/my-appointments.html'">My Appointments</button>
+    <button onclick="window.location.href='/patient/paypal.html'">Paypal</button>
+    <br><br>
+    <button onclick="window.location.href='/patient/placeOrder.html'">Place Pharmacy Order</button>
+    <button onclick="window.location.href='/patient/viewOrders.html'">My Pharmacy Orders</button>
+    <button onclick="window.location.href='view-profile.html'">View Profile</button>
+    <br><br>
+
+    <button onclick="window.location.href='/patient/answer-questions.html'">📝 Answer Health Questions</button>
+    <button onclick="window.location.href='/patient/view-submitted-answers.html'">View My Submitted Answers</button>
+
+    <br><br>
+
+    <button onclick="window.location.href='/patient/insurance-patient.html'">Insurance</button>
+    
+    <button onclick="window.location.href='update-profile.html'">Update Profile</button>
+    <button onclick="logout()">Logout</button>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+
+    if (token) {
+      // Save token to localStorage
+      localStorage.setItem('token', token);
+
+      try {
+        // Decode payload from token (base64 decode the second part of JWT)
+        const payload = JSON.parse(atob(token.split('.')[1]));
+
+        // Save user role and ID
+        if (payload.role) localStorage.setItem('userRole', payload.role);
+        if (payload.id) localStorage.setItem('userId', payload.id);
+      } catch (err) {
+        console.error('Failed to decode token:', err.message);
+      }
+
+      // Clean the URL by removing ?token=...
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    function logout() {
+      localStorage.clear();
+      window.location.href = 'login.html';
+    }
+  </script>
+</body>
+</html>

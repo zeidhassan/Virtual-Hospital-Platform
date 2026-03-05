@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build/Test artifacts
+coverage/
+dist/
+build/
+
+# Environment files (never commit secrets)
+.env
+.env.test
+.env.local
+.env.*.local
+
+# Logs / misc
+*.log
+.DS_Store
+
+# Local assets
+test-picture.png
+*.zip
+project password.txt

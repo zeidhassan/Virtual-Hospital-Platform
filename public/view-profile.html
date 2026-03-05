@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>View Profile</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      background: #f5f7fa;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .profile-card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 0 12px rgba(0, 0, 0, 0.1);
+      padding: 30px;
+      width: 90%;
+      max-width: 600px;
+    }
+    .profile-card h2 {
+      margin-bottom: 20px;
+      color: #333;
+      text-align: center;
+    }
+    .profile-info {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      row-gap: 12px;
+      column-gap: 10px;
+    }
+    .profile-info strong {
+      color: #555;
+    }
+    .profile-info span {
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="profile-card">
+    <h2>Your Profile</h2>
+    <button onclick="goBack()" style="margin-bottom: 20px; padding: 10px 20px; border: none; background-color: #6c757d; color: white; border-radius: 6px; cursor: pointer;">← Back to Dashboard</button>
+    <div class="profile-info" id="profileData"></div>
+  </div>
+
+  <script>
+    const token = localStorage.getItem('token');
+
+    fetch('/api/auth/profile', {
+      headers: {
+        'Authorization': 'Bearer ' + token
+      }
+    })
+    .then(res => res.json())
+    .then(data => {
+      const container = document.getElementById('profileData');
+      for (let key in data) {
+        const label = document.createElement('strong');
+        const value = document.createElement('span');
+        label.textContent = key.replace(/_/g, ' ') + ':';
+        value.textContent = data[key] || 'N/A';
+        container.appendChild(label);
+        container.appendChild(value);
+      }
+    })
+    .catch(err => {
+      document.getElementById('profileData').innerHTML = '<strong>Error loading profile.</strong>';
+      console.error(err);
+    });
+    function goBack() {
+  const role = localStorage.getItem('userRole');
+  if (role === 'admin') {
+    window.location.href = 'admin-dashboard.html';
+  } else if (role === 'doctor') {
+    window.location.href = 'doctor-dashboard.html';
+  } else if (role === 'patient') {
+    window.location.href = 'patient-dashboard.html';
+  } else {
+    alert('Unknown role. Logging out for safety.');
+    localStorage.clear();
+    window.location.href = 'login.html';
+  }
+}
+  </script>
+</body>
+</html>

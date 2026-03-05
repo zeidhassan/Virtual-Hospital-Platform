@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Update Subscription</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f2f2f2; padding: 30px; }
+    .card { margin-bottom: 20px; }
+    pre { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2 class="mb-4">Manage My Subscription</h2>
+
+  <div id="current-subscription" class="mb-5"></div>
+
+  <h4>Change Plan</h4>
+  <div id="plan-options" class="row"></div>
+
+  <div class="text-center mt-4">
+    <button class="btn btn-danger" onclick="cancelSubscription()">Cancel Current Subscription</button>
+  </div>
+</div>
+
+<script>
+  const token = localStorage.getItem('token');
+  let currentSubscriptionId = null;
+
+  async function loadCurrent() {
+    try {
+      const res = await fetch('/api/doctor/subscriptions/current', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      currentSubscriptionId = data.id;
+
+      document.getElementById('current-subscription').innerHTML = `
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title">${data.plan_name}</h5>
+            <p>Status: <strong>${data.status}</strong></p>
+            <p>Billing Cycle: ${data.billing_cycle}</p>
+            <p>Start: ${data.start_date || 'N/A'}, End: ${data.end_date || 'N/A'}</p>
+            <h6 class="mt-3">Current Features:</h6>
+            <pre class="bg-light p-2 rounded small">${JSON.stringify(data.features, null, 2)}</pre>
+          </div>
+        </div>
+      `;
+    } catch (err) {
+      alert(err.message || "Couldn't load subscription.");
+    }
+  }
+
+  async function loadPlans() {
+    try {
+      const res = await fetch('/api/doctor/subscriptions/plans', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const plans = await res.json();
+      if (!Array.isArray(plans)) throw new Error("Invalid response");
+
+      const container = document.getElementById('plan-options');
+      container.innerHTML = '';
+
+      plans.forEach(plan => {
+        const col = document.createElement('div');
+        col.className = 'col-md-4';
+        col.innerHTML = `
+          <div class="card shadow-sm">
+            <div class="card-body">
+              <h5 class="card-title">${plan.name}</h5>
+              <p>${plan.description || ''}</p>
+              <p>Monthly: ${plan.monthly_price}, Yearly: ${plan.yearly_price}</p>
+              <pre class="bg-light p-2 small rounded">${JSON.stringify(plan.features, null, 2)}</pre>
+              <button class="btn btn-success" onclick="changePlan(${plan.id}, 'monthly')">Switch to Monthly</button>
+              <button class="btn btn-outline-success mt-2" onclick="changePlan(${plan.id}, 'yearly')">Switch to Yearly</button>
+            </div>
+          </div>
+        `;
+        container.appendChild(col);
+      });
+    } catch (err) {
+      alert(err.message || "Couldn't load plans.");
+    }
+  }
+
+  async function changePlan(newPlanId, cycle) {
+    if (!currentSubscriptionId) return alert("Subscription ID missing.");
+    const res = await fetch(`/api/doctor/subscriptions/${currentSubscriptionId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        new_plan_id: newPlanId,
+        new_billing_cycle: cycle
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) return alert(data.error || "Update failed.");
+    alert(data.message || "Subscription updated.");
+    location.reload();
+  }
+
+  async function cancelSubscription() {
+    if (!currentSubscriptionId) return alert("Subscription ID missing.");
+    if (!confirm("Are you sure you want to cancel this subscription?")) return;
+
+    const res = await fetch(`/api/doctor/subscriptions/${currentSubscriptionId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ cancel: true })
+    });
+
+    const data = await res.json();
+    if (!res.ok) return alert(data.error || "Cancel failed.");
+    alert(data.message || "Subscription cancelled.");
+    location.reload();
+  }
+
+  loadCurrent();
+  loadPlans();
+</script>
+
+</body>
+</html>

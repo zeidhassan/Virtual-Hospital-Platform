@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>My Patients</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f8f9fa;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    .patient-card {
+      background: #fff;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 8px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+    .patient-card h3 {
+      margin: 0;
+      color: #007bff;
+    }
+    .patient-card p {
+      margin: 5px 0;
+      color: #555;
+    }
+    .btn-back {
+      display: block;
+      width: fit-content;
+      margin: 20px auto;
+      padding: 10px 20px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>My Patients</h1>
+  <div id="patientsContainer"></div>
+  <button class="btn-back" onclick="goBack()">⬅ Back to Dashboard</button>
+
+  <script>
+    const token = localStorage.getItem('token');
+
+    async function loadPatients() {
+      try {
+        const res = await fetch('/api/doctor/patients', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        const data = await res.json();
+        const container = document.getElementById('patientsContainer');
+        container.innerHTML = '';
+
+        data.forEach(patient => {
+          const card = document.createElement('div');
+          card.className = 'patient-card';
+          card.innerHTML = `
+            <h3>${patient.full_name}</h3>
+            <p><strong>Email:</strong> ${patient.email}</p>
+            <p><strong>Blood Group:</strong> ${patient.blood_group}</p>
+            <p><strong>Allergies:</strong> ${patient.allergies}</p>
+            <p><strong>Chronic Conditions:</strong> ${patient.chronic_conditions}</p>
+          `;
+          container.appendChild(card);
+        });
+      } catch (err) {
+        console.error('Error loading patients:', err);
+        alert('Failed to load patient data.');
+      }
+    }
+
+    function goBack() {
+      const role = localStorage.getItem('userRole');
+      if (role === 'doctor') {
+        window.location.href = '../doctor-dashboard.html';
+      } else {
+        alert('Access denied.');
+      }
+    }
+
+    // Load on page load
+    window.onload = loadPatients;
+  </script>
+</body>
+</html>

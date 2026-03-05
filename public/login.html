@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Login | Virtual Hospital Platform</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .form-container {
+      background: #fff;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+
+    h2 {
+      margin-bottom: 1.5rem;
+      color: #333;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    .primary-button {
+      background-color: #007bff;
+      color: white;
+    }
+
+    .primary-button:hover {
+      background-color: #0056b3;
+    }
+
+    .secondary-button {
+      background-color: #6c757d;
+      color: white;
+    }
+
+    .secondary-button:hover {
+      background-color: #5a6268;
+    }
+
+    .error-message {
+      color: red;
+      font-size: 14px;
+      margin-top: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="form-container">
+    <h2>Login to Virtual Hospital Platform</h2>
+    <input type="email" id="email" placeholder="Enter your email" required />
+    <input type="password" id="password" placeholder="Enter your password" required />
+    <button id="loginBtn" class="primary-button">Login</button>
+    <a href="/api/auth/google" style="text-decoration: none;">
+      <button class="secondary-button" style="background-color: #db4437;">Login with Google</button>
+    </a>
+    <a href="/api/auth/facebook" style="text-decoration: none;">
+      <button class="secondary-button" style="background-color: #3b5998;">Login with Facebook</button>
+    </a>
+    <button onclick="register()" class="secondary-button">Register Page</button>
+    <div id="errorMessage" class="error-message"></div>
+  </div>
+
+  <script>
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const errorBox = document.getElementById('errorMessage');
+      errorBox.textContent = '';
+
+      if (!email || !password) {
+        errorBox.textContent = 'Please enter both email and password.';
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          errorBox.textContent = data?.error?.toLowerCase().includes('token')
+            ? 'Token generation issue. Contact admin.'
+            : data.error || 'Login failed.';
+          return;
+        }
+
+        // Store token and role in localStorage
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('userRole', data.user.role);
+        localStorage.setItem('userId', data.user.id);
+
+        // Redirect based on user role
+        if (data.user.role === 'admin') {
+          window.location.href = 'admin-dashboard.html';
+        } else if (data.user.role === 'patient') {
+          window.location.href = 'patient-dashboard.html';
+        } else if (data.user.role === 'doctor') {
+          window.location.href = 'doctor-dashboard.html';
+        }
+      } catch (error) {
+        errorBox.textContent = 'Server connection failed. Please try again.';
+      }
+    });
+
+    function register() {
+      localStorage.clear();
+      window.location.href = 'register.html';
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Insurance Admin Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f4f6f9; padding: 30px; }
+    h2 { margin-top: 40px; }
+    table { font-size: 0.9rem; }
+    .badge { font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1 class="mb-4">🧾 Insurance Admin Dashboard</h1>
+
+  <!-- 1. Stats -->
+  <h2>📊 Insurance Usage Stats</h2>
+  <div id="stats" class="d-flex gap-3 mb-4 flex-wrap"></div>
+
+  <!-- 2. All Requests -->
+  <h2>📁 All Insurance Requests</h2>
+  <table class="table table-bordered table-striped" id="requests-table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Patient</th>
+        <th>Doctor</th>
+        <th>Company</th>
+        <th>Amount</th>
+        <th>Description</th>
+        <th>Status</th>
+        <th>Created</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <!-- 3. Bills by Payment Type -->
+  <h2>💳 Bills by Payment Type</h2>
+  <div class="mb-2">
+    <select class="form-select w-auto" id="payment-type-select" onchange="loadBills()">
+      <option value="insurance">Insurance</option>
+      <option value="direct">Direct</option>
+    </select>
+  </div>
+  <table class="table table-hover" id="bills-table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Patient</th>
+        <th>Amount</th>
+        <th>Description</th>
+        <th>Status</th>
+        <th>Created</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <!-- 4. Export -->
+  <h2>⬇️ Export Transactions</h2>
+  <button onclick="downloadCSV()" class="btn btn-success">Download CSV</button>
+
+</div>
+
+<script>
+  const token = localStorage.getItem('token');
+
+  async function fetchData(url) {
+    const res = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+  }
+
+  async function loadStats() {
+    try {
+      const stats = await fetchData('/api/admin/insurance/stats');
+      const container = document.getElementById('stats');
+      container.innerHTML = '';
+      stats.forEach(row => {
+        container.innerHTML += `
+          <div class="card p-3 shadow-sm text-center">
+            <strong class="text-capitalize">${row.status}</strong>
+            <div class="fs-4">${row.count}</div>
+          </div>
+        `;
+      });
+    } catch (err) {
+      alert("Error loading stats: " + err.message);
+    }
+  }
+
+  async function loadRequests() {
+    try {
+      const data = await fetchData('/api/insurance-requests');
+      const tbody = document.querySelector('#requests-table tbody');
+      tbody.innerHTML = '';
+      data.forEach(row => {
+        tbody.innerHTML += `
+          <tr>
+            <td>${row.id}</td>
+            <td>${row.patient_name}</td>
+            <td>${row.doctor_name}</td>
+            <td>${row.insurance_company}</td>
+            <td>${row.amount}</td>
+            <td>${row.description}</td>
+            <td><span class="badge bg-${row.status === 'accepted' ? 'success' : row.status === 'pending' ? 'warning text-dark' : 'danger'}">${row.status}</span></td>
+            <td>${new Date(row.created_at).toLocaleString()}</td>
+          </tr>
+        `;
+      });
+    } catch (err) {
+      alert("Error loading insurance requests: " + err.message);
+    }
+  }
+
+  async function loadBills() {
+    try {
+      const type = document.getElementById('payment-type-select').value;
+      const data = await fetchData(`/api/admin/insurance/bills?payment_type=${type}`);
+      const tbody = document.querySelector('#bills-table tbody');
+      tbody.innerHTML = '';
+      data.forEach(row => {
+        tbody.innerHTML += `
+          <tr>
+            <td>${row.id}</td>
+            <td>${row.patient_name}</td>
+            <td>${row.amount}</td>
+            <td>${row.description}</td>
+            <td>${row.status}</td>
+            <td>${new Date(row.created_at).toLocaleString()}</td>
+          </tr>
+        `;
+      });
+    } catch (err) {
+      alert("Error loading bills: " + err.message);
+    }
+  }
+
+  async function downloadCSV() {
+    const token = localStorage.getItem('token');
+    if (!token) return alert("You must be logged in.");
+
+    try {
+        const res = await fetch('/api/admin/insurance/export', {
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+        });
+
+        if (!res.ok) throw new Error("Failed to download CSV.");
+
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'insurance_report.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        window.URL.revokeObjectURL(url);
+    } catch (err) {
+        console.error("Download error:", err);
+        alert(err.message || "An error occurred while downloading.");
+    }
+    }
+
+  loadStats();
+  loadRequests();
+  loadBills();
+</script>
+
+</body>
+</html>

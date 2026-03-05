@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>My Time Slots</title>
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+</head>
+<body class="p-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>My Time Slots</h2>
+    <a href="/doctor-dashboard.html" class="btn btn-secondary">← Dashboard</a>
+  </div>
+
+  <table class="table table-striped" id="slotsTable">
+    <thead>
+      <tr>
+        <th>Day</th><th>Start</th><th>End</th><th>Action</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <form id="addSlotForm" class="row g-3 mb-4">
+    <div class="col-md-4">
+      <label class="form-label">Day</label>
+      <select id="day_of_week" class="form-select" required>
+        <option disabled selected value="">Choose…</option>
+        <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
+        <option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Start Time</label>
+      <input id="start_time" type="time" class="form-control" required/>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">End Time</label>
+      <input id="end_time" type="time" class="form-control" required/>
+    </div>
+    <div class="col-md-2 d-grid">
+      <button class="btn btn-success">Add</button>
+    </div>
+  </form>
+
+  <script>
+    const token = localStorage.getItem('token');
+    const tableBody = document.querySelector('#slotsTable tbody');
+    const form      = document.getElementById('addSlotForm');
+
+    async function loadSlots() {
+      const res = await fetch('/api/doctor/slots', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const slots = await res.json();
+      tableBody.innerHTML = slots.map(s => `
+        <tr>
+          <td>${s.day_of_week}</td>
+          <td>${s.start_time}</td>
+          <td>${s.end_time}</td>
+          <td>
+            <button class="btn btn-sm btn-danger" onclick="deleteSlot(${s.id})">
+              Delete
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function deleteSlot(id) {
+      if (!confirm('Delete this slot?')) return;
+      await fetch(`/api/doctor/slots/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      loadSlots();
+    }
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const data = {
+        day_of_week: form.day_of_week.value,
+        start_time:  form.start_time.value,
+        end_time:    form.end_time.value
+      };
+      await fetch('/api/doctor/slots', {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          Authorization:    `Bearer ${token}`
+        },
+        body: JSON.stringify(data)
+      });
+      form.reset();
+      loadSlots();
+    });
+
+    loadSlots();
+  </script>
+</body>
+</html>

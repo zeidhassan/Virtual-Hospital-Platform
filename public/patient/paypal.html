@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Patient Payment - PayPal</title>
+  <script src="https://www.paypal.com/sdk/js?client-id=YOUR_PAYPAL_CLIENT_ID&currency=USD"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f7fa;
+      padding: 40px;
+    }
+    .container {
+      max-width: 400px;
+      background: #fff;
+      margin: auto;
+      padding: 25px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 12px;
+      margin-bottom: 16px;
+      font-size: 16px;
+    }
+    #paypal-button-container {
+      margin-top: 20px;
+    }
+    .back-btn {
+      margin-top: 20px;
+      display: block;
+      text-align: center;
+      color: #666;
+      text-decoration: underline;
+      background: none;
+      border: none;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Make a Payment</h2>
+    <input type="number" id="amount" placeholder="Enter amount (USD)" min="0.01" step="0.01" required>
+    <div id="paypal-button-container"></div>
+    <button class="back-btn" onclick="goBack()">Back to Dashboard</button>
+  </div>
+
+  <script>
+    // Authorization check
+    window.addEventListener('DOMContentLoaded', () => {
+      const token = localStorage.getItem('token');
+      const role = localStorage.getItem('userRole');
+
+      if (!token || role !== 'patient') {
+        alert("Unauthorized access. Redirecting...");
+        localStorage.clear();
+        window.location.href = '../login.html';
+      }
+    });
+
+    function goBack() {
+      window.location.href = '../patient-dashboard.html';
+    }
+
+    paypal.Buttons({
+      createOrder: function(data, actions) {
+        const amount = document.getElementById('amount').value;
+        if (!amount || parseFloat(amount) <= 0) {
+          alert("Please enter a valid amount.");
+          throw new Error("Invalid amount.");
+        }
+
+        return fetch('/api/payments/create-order', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + localStorage.getItem('token')
+          },
+          body: JSON.stringify({ amount })
+        })
+        .then(res => {
+          if (!res.ok) throw new Error("Failed to create order.");
+          return res.json();
+        })
+        .then(data => data.id);
+      },
+
+      onApprove: function(data, actions) {
+        return fetch('/api/payments/webhook', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ message: 'Payment approved by patient' })
+        })
+        .then(res => res.json())
+        .then(data => {
+          alert('Payment completed successfully!');
+        });
+      }
+
+    }).render('#paypal-button-container');
+  </script>
+</body>
+</html>

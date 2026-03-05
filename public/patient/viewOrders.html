@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>My Pharmacy Orders</title>
+  <style>
+    body { font-family: Arial; background: #f4f6f8; padding: 20px; }
+    table { width: 100%; border-collapse: collapse; background: white; margin-top: 20px; }
+    th, td { padding: 12px; border: 1px solid #ccc; text-align: left; }
+    th { background-color: #2c7a7b; color: white; }
+    a.button {
+      padding: 5px 10px;
+      background: #2c7a7b;
+      color: white;
+      border-radius: 4px;
+      text-decoration: none;
+    }
+    .back-btn {
+      margin-bottom: 15px;
+      padding: 8px 16px;
+      background: #6c757d;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <button class="back-btn" onclick="goBack()">← Back to Dashboard</button>
+  <h2>My Pharmacy Orders</h2>
+  <table id="ordersTable">
+    <thead>
+      <tr>
+        <th>Order ID</th>
+        <th>Medications</th>
+        <th>Total (SAR)</th>
+        <th>Status</th>
+        <th>Prescription</th>
+        <th>Ordered At</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+<script>
+  function goBack() {
+    const role = localStorage.getItem('userRole');
+    if (role === 'patient') {
+      window.location.href = '/patient-dashboard.html';
+    } else if (role === 'admin') {
+      window.location.href = '/admin-dashboard.html';
+    } else if (role === 'doctor') {
+      window.location.href = '/doctor-dashboard.html';
+    } else {
+      window.location.href = '/login.html';
+    }
+  }
+
+  async function fetchOrders() {
+    const token = localStorage.getItem('token');
+    console.log("[DEBUG] Token:", token);
+
+    try {
+      const resUser = await fetch('/api/patient/profile', {
+        headers: { Authorization: 'Bearer ' + token }
+      });
+
+      console.log("[DEBUG] resUser status:", resUser.status);
+      const patientData = await resUser.json();
+      console.log("[DEBUG] Patient Profile Data:", patientData);
+
+      // FIXED: Extract patient_id instead of just id
+      const patientId = patientData.patient_id;
+      if (!patientId) {
+        console.error("[ERROR] patient_id missing in response");
+        alert("Invalid patient ID");
+        return;
+      }
+
+      const res = await fetch(`/api/pharmacy-orders/patient/${patientId}`, {
+        headers: { Authorization: 'Bearer ' + token }
+      });
+
+      console.log("[DEBUG] Orders response status:", res.status);
+      const data = await res.json();
+      console.log("[DEBUG] Orders Data:", data);
+
+      if (!Array.isArray(data)) {
+        alert("Failed to load orders");
+        console.error("[ERROR] Invalid orders response format:", data);
+        return;
+      }
+
+      const tbody = document.querySelector('#ordersTable tbody');
+      tbody.innerHTML = '';
+
+      data.forEach(order => {
+        let meds;
+        try {
+          meds = Array.isArray(order.medications)
+            ? order.medications.join(', ')
+            : JSON.parse(order.medications).join(', ');
+        } catch (err) {
+          console.warn("[WARN] Failed to parse medications for order:", order.id, err);
+          meds = order.medications;
+        }
+
+        const file = order.prescription_file ? order.prescription_file.split('/').pop() : null;
+        const row = document.createElement('tr');
+
+        row.innerHTML = `
+          <td>${order.id}</td>
+          <td>${meds}</td>
+          <td>${Number(order.total_amount).toFixed(2)}</td>
+          <td>${order.status}</td>
+          <td>${file ? `<a class="button" href="/${order.prescription_file}" target="_blank">View</a>` : 'N/A'}</td>
+          <td>${new Date(order.ordered_at).toLocaleString()}</td>
+        `;
+        tbody.appendChild(row);
+      });
+
+    } catch (error) {
+      console.error("[ERROR] fetchOrders exception:", error);
+      alert("An unexpected error occurred while fetching orders.");
+    }
+  }
+
+  fetchOrders();
+</script>
+
+</body>
+</html>

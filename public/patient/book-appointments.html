@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Book Appointment</title>
+  <style>
+    /* Your beautiful CSS */
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f5f7fa;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .panel-container {
+      background-color: #ffffff;
+      padding: 30px 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      max-width: 450px;
+    }
+
+    .panel-container h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #333333;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      color: #555;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 14px;
+      background-color: #fdfdfd;
+      transition: border-color 0.3s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: #4A90E2;
+      outline: none;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #4A90E2;
+      color: white;
+      font-weight: bold;
+      font-size: 15px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background-color: #357ABD;
+    }
+
+    pre#output {
+      margin-top: 20px;
+      background: #f0f0f0;
+      padding: 15px;
+      border-radius: 8px;
+      font-size: 13px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="panel-container">
+    <h2>Book an Appointment</h2>
+
+    <label for="specializationSelect">Select Specialization</label>
+    <select id="specializationSelect" onchange="loadDoctors()">
+      <option value="">-- Select Specialization --</option>
+    </select>
+
+    <label for="doctorSelect">Select Doctor</label>
+    <select id="doctorSelect" onchange="loadDoctorAvailableDays()">
+      <option value="">-- Select Doctor --</option>
+    </select>
+
+    <label for="appointment_date">Appointment Date</label>
+    <input type="date" id="appointment_date">
+
+    <label for="slotSelect">Available Time Slots</label>
+    <select id="slotSelect">
+      <option value="">-- Select Time Slot --</option>
+    </select>
+
+    <label for="notes">Notes (optional)</label>
+    <textarea id="notes" placeholder="Enter notes"></textarea>
+
+    <button onclick="bookAppointment()">Book Appointment</button>
+
+    <pre id="output"></pre>
+
+    <button onclick="goBack()">⬅ Back to Dashboard</button>
+  </div>
+
+  <script>
+    let availableDays = [];
+
+    function authHeaders() {
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + localStorage.getItem('token')
+      };
+    }
+
+    function setTodayAsMinDate() {
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('appointment_date').setAttribute('min', today);
+    }
+
+    async function loadSpecializations() {
+      const res = await fetch('/api/patient/appointments/specializations', { headers: authHeaders() });
+      const specs = await res.json();
+      const specSelect = document.getElementById('specializationSelect');
+      specs.forEach(spec => {
+        const option = document.createElement('option');
+        option.value = spec.specialization;
+        option.textContent = spec.specialization;
+        specSelect.appendChild(option);
+      });
+    }
+
+    async function loadDoctors() {
+      const specialization = document.getElementById('specializationSelect').value;
+      const doctorSelect = document.getElementById('doctorSelect');
+      doctorSelect.innerHTML = '<option value="">-- Select Doctor --</option>';
+      document.getElementById('slotSelect').innerHTML = '<option value="">-- Select Time Slot --</option>';
+      document.getElementById('appointment_date').value = '';
+
+      if (!specialization) return;
+
+      const res = await fetch(`/api/patient/appointments/doctors-by-specialization/${specialization}`, { headers: authHeaders() });
+      const doctors = await res.json();
+
+      doctors.forEach(doc => {
+        const option = document.createElement('option');
+        option.value = doc.doctor_id;
+        option.textContent = doc.full_name;
+        doctorSelect.appendChild(option);
+      });
+    }
+
+    async function loadDoctorAvailableDays() {
+      const doctorId = document.getElementById('doctorSelect').value;
+      if (!doctorId) return;
+
+      const res = await fetch(`/api/patient/appointments/doctor-time-slots/${doctorId}`, { headers: authHeaders() });
+      const slots = await res.json();
+
+      // Save available days
+      availableDays = [...new Set(slots.map(slot => slot.day_of_week))];
+      document.getElementById('slotSelect').innerHTML = '<option value="">-- Select Time Slot --</option>';
+      document.getElementById('appointment_date').value = '';
+    }
+
+    document.getElementById('appointment_date').addEventListener('input', async function() {
+      const selectedDate = new Date(this.value);
+      const dayOfWeek = selectedDate.toLocaleString('en-US', { weekday: 'long' });
+
+      if (!availableDays.includes(dayOfWeek)) {
+        alert("This doctor is not available on that day. Please select a valid date.");
+        this.value = '';
+        document.getElementById('slotSelect').innerHTML = '<option value="">-- Select Time Slot --</option>';
+      } else {
+        loadTimeSlots();
+      }
+    });
+
+    async function loadTimeSlots() {
+      const doctorId = document.getElementById('doctorSelect').value;
+      const appointmentDate = document.getElementById('appointment_date').value;
+      const slotSelect = document.getElementById('slotSelect');
+      slotSelect.innerHTML = '<option value="">-- Select Time Slot --</option>';
+
+      if (!doctorId || !appointmentDate) return;
+
+      const res = await fetch(`/api/patient/appointments/doctor-time-slots/${doctorId}`, { headers: authHeaders() });
+      const slots = await res.json();
+
+      const dayOfWeek = new Date(appointmentDate).toLocaleString('en-US', { weekday: 'long' });
+
+      const availableSlots = slots.filter(slot => slot.day_of_week === dayOfWeek);
+
+      availableSlots.forEach(slot => {
+        const option = document.createElement('option');
+        option.value = `${slot.start_time}-${slot.end_time}`;
+        option.textContent = `${slot.start_time} - ${slot.end_time}`;
+        slotSelect.appendChild(option);
+      });
+    }
+
+    async function bookAppointment() {
+      const doctor_id = document.getElementById('doctorSelect').value;
+      const appointment_date = document.getElementById('appointment_date').value;
+      const timeRange = document.getElementById('slotSelect').value;
+      const notes = document.getElementById('notes').value;
+
+      if (!doctor_id || !appointment_date || !timeRange) {
+        alert('Please complete all fields.');
+        return;
+      }
+
+      const [appointment_start_time, appointment_end_time] = timeRange.split('-');
+
+      const body = {
+        doctor_id,
+        appointment_date,
+        appointment_start_time,
+        appointment_end_time,
+        notes,
+      };
+
+      const res = await fetch('/api/patient/appointments', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(body)
+      });
+
+      const data = await res.json();
+      showOutput(data);
+    }
+
+    function showOutput(data) {
+      const output = document.getElementById('output');
+      output.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+    }
+
+    function goBack() {
+      const role = localStorage.getItem("userRole");
+      if (role === "patient") {
+        window.location.href = "../patient-dashboard.html";
+      } else {
+        alert("Unauthorized access.");
+      }
+    }
+
+    window.onload = () => {
+      setTodayAsMinDate();
+      loadSpecializations();
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Medical Records</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f1f1f1;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      color: #222;
+    }
+    .record-card {
+      background: #fff;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 8px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+    .record-card input, .record-card textarea {
+      width: 100%;
+      margin-top: 5px;
+      margin-bottom: 10px;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+    .record-card button {
+      padding: 8px 16px;
+      background-color: #28a745;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .btn-back {
+      display: block;
+      width: fit-content;
+      margin: 20px auto;
+      padding: 10px 20px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Medical Records</h1>
+  <div id="recordsContainer"></div>
+  <button class="btn-back" onclick="goBack()">⬅ Back to Dashboard</button>
+
+  <script>
+    const token = localStorage.getItem('token');
+
+    async function loadRecords() {
+      try {
+        const res = await fetch('/api/doctor/records', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        const data = await res.json();
+        const container = document.getElementById('recordsContainer');
+        container.innerHTML = '';
+
+        data.forEach(record => {
+          const card = document.createElement('div');
+          card.className = 'record-card';
+          card.innerHTML = `
+            <p><strong>Record ID:</strong> ${record.id}</p>
+            <p><strong>Patient:</strong> ${record.patient_name}</p>
+            <label>Description:</label>
+            <textarea id="desc-${record.id}">${record.description}</textarea>
+            <button onclick="updateRecord(${record.id})">Update Record</button>
+          `;
+          container.appendChild(card);
+        });
+      } catch (err) {
+        console.error('Error loading records:', err);
+        alert('Failed to load medical records.');
+      }
+    }
+
+    async function updateRecord(recordId) {
+      const description = document.getElementById(`desc-${recordId}`).value;
+
+      try {
+        const res = await fetch(`/api/doctor/records/${recordId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ description })
+        });
+
+        const result = await res.json();
+        alert('Record updated successfully!');
+      } catch (err) {
+        console.error('Error updating record:', err);
+        alert('Failed to update record.');
+      }
+    }
+
+    function goBack() {
+      window.location.href = '../doctor-dashboard.html';
+    }
+
+    window.onload = loadRecords;
+  </script>
+</body>
+</html>

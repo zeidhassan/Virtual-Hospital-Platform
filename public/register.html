@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Register | Virtual Hospital Platform</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .form-container {
+      background: #fff;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      max-width: 400px;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    .link-button {
+      width: 100%;
+      padding: 12px;
+      background-color: #6c757d;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 8px;
+    }
+
+    .link-button:hover {
+      background-color: #5a6268;
+    }
+
+    .error-message {
+      color: red;
+      text-align: center;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="form-container">
+    <h2>Register to Virtual Hospital Platform</h2>
+
+    <input type="text" id="full_name" placeholder="Full Name" required />
+    <input type="email" id="email" placeholder="Email" required />
+    <input type="password" id="password" placeholder="Password" required />
+    <select id="role">
+      <option value="patient">Patient</option>
+      <option value="doctor">Doctor</option>
+      <option value="admin">Admin</option>
+    </select>
+    <input type="text" id="phone" placeholder="Phone Number" />
+    <select id="gender">
+      <option value="">Select Gender</option>
+      <option value="male">Male</option>
+      <option value="female">Female</option>
+      <option value="other">Other</option>
+    </select>
+    <input type="date" id="date_of_birth" placeholder="Date of Birth" />
+
+    <button id="registerBtn">Register</button>
+    <button class="link-button" onclick="goToLogin()">Login page</button>
+
+    <div id="errorMessage" class="error-message"></div>
+  </div>
+
+  <script>
+    function goToLogin() {
+      localStorage.clear();
+      window.location.href = 'login.html';
+    }
+
+    document.getElementById('registerBtn').addEventListener('click', async () => {
+      const full_name = document.getElementById('full_name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const role = document.getElementById('role').value;
+      const phone = document.getElementById('phone').value.trim();
+      const gender = document.getElementById('gender').value;
+      const date_of_birth = document.getElementById('date_of_birth').value;
+
+      const errorBox = document.getElementById('errorMessage');
+      errorBox.textContent = '';
+
+      if (!full_name || !email || !password || !role) {
+        errorBox.textContent = 'Please fill in all required fields.';
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            full_name, email, password, role, phone, gender, date_of_birth
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          errorBox.textContent = data.error || 'Registration failed.';
+          return;
+        }
+
+        alert('Registration successful! Redirecting to login...');
+        window.location.href = 'login.html';
+      } catch (error) {
+        errorBox.textContent = 'Server error. Please try again.';
+        console.error('Registration error:', error);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<div class="panel-container">
+  <h2>Messages Panel</h2>
+  
+  <label for="sort">Sort</label>
+  <input type="text" id="sort" placeholder="Enter sort order (default: +id)">
+
+  <label for="page">Page</label>
+  <input type="number" id="page" placeholder="Enter page number (default: 1)">
+
+  <label for="limit">Limit</label>
+  <input type="number" id="limit" placeholder="Enter limit (default: 10)">
+
+  <label for="id">Message ID</label>
+  <input type="number" id="id" placeholder="Enter message ID">
+
+  <label for="sender_id">Sender ID</label>
+  <input type="number" id="sender_id" placeholder="Enter sender ID">
+
+  <label for="receiver_id">Receiver ID</label>
+  <input type="number" id="receiver_id" placeholder="Enter receiver ID">
+
+  <label for="message">Message</label>
+  <textarea id="message" placeholder="Enter message content"></textarea>
+
+  <label for="is_read">Is Read</label>
+  <select id="is_read">
+    <option value="false" selected>Unread</option>
+    <option value="true">Read</option>
+  </select>
+
+  <button>Get All Messages</button>
+  <button>Get Message by ID</button>
+  <button>Create Message</button>
+  <button>Update Message</button>
+  <button>Delete Message</button>
+</div>

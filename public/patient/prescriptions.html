@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>My Prescriptions</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f3f4f6;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.07);
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 30px;
+    }
+
+    #error {
+      color: red;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background-color: #f9fafb;
+      border-left: 5px solid #10b981;
+      padding: 15px 20px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      transition: 0.3s ease;
+    }
+
+    .card:hover {
+      background-color: #e7f8f1;
+    }
+
+    .details {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+    }
+
+    .details div {
+      margin-bottom: 8px;
+    }
+
+    .label {
+      font-weight: 600;
+      color: #444;
+    }
+
+    .value {
+      color: #111;
+    }
+
+    button {
+      display: block;
+      margin: 30px auto 0;
+      padding: 10px 20px;
+      background: #10b981;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: 0.2s ease-in-out;
+    }
+
+    button:hover {
+      background: #059669;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>💊 My Prescriptions</h1>
+    <p id="error"></p>
+    <div id="prescriptionsContainer"></div>
+    <button onclick="goBack()">⬅ Back to Dashboard</button>
+  </div>
+
+  <script>
+    async function loadPrescriptions() {
+      const token = localStorage.getItem("token");
+      const error = document.getElementById("error");
+      const container = document.getElementById("prescriptionsContainer");
+
+      if (!token) {
+        error.textContent = "No token found. Please log in again.";
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/patient/prescriptions", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!res.ok) throw new Error("Failed to fetch prescriptions");
+
+        const prescriptions = await res.json();
+        container.innerHTML = "";
+
+        if (prescriptions.length === 0) {
+          container.innerHTML = "<p style='text-align:center;'>No prescriptions found.</p>";
+          return;
+        }
+
+        prescriptions.forEach(pres => {
+          const card = document.createElement("div");
+          card.className = "card";
+          card.innerHTML = `
+            <div class="details">
+              <div><span class="label">📋 Medication:</span> <span class="value">${pres.medication}</span></div>
+              <div><span class="label">💊 Dosage:</span> <span class="value">${pres.dosage}</span></div>
+              <div><span class="label">📝 Instructions:</span> <span class="value">${pres.instructions}</span></div>
+              <div><span class="label">📅 Issued:</span> <span class="value">${new Date(pres.issued_date).toLocaleDateString()}</span></div>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+
+      } catch (err) {
+        console.error(err);
+        error.textContent = "Unable to load prescriptions.";
+      }
+    }
+
+    function goBack() {
+      const role = localStorage.getItem("userRole");
+      if (role === "patient") {
+        window.location.href = "../patient-dashboard.html";
+      } else {
+        alert("Unauthorized access.");
+      }
+    }
+
+    window.onload = loadPrescriptions;
+  </script>
+</body>
+</html>

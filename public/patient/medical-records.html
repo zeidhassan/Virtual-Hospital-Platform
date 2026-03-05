@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>My Medical Records</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f1f5f9;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #ffffff;
+      border-radius: 10px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    h1 {
+      text-align: center;
+      color: #2d3748;
+      margin-bottom: 30px;
+    }
+
+    #error {
+      color: #dc2626;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .record-card {
+      background: #f9fafb;
+      border-left: 5px solid #6366f1;
+      padding: 15px 20px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      transition: 0.3s ease;
+    }
+
+    .record-card:hover {
+      background: #eef2ff;
+    }
+
+    .record-details {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+    }
+
+    .record-details div {
+      margin-bottom: 8px;
+    }
+
+    .label {
+      font-weight: 600;
+      color: #374151;
+    }
+
+    .value {
+      color: #111827;
+    }
+
+    button {
+      display: block;
+      margin: 30px auto 0;
+      padding: 10px 20px;
+      background: #6366f1;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: 0.2s ease-in-out;
+    }
+
+    button:hover {
+      background: #4f46e5;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📁 My Medical Records</h1>
+    <p id="error"></p>
+    <div id="recordsContainer"></div>
+    <button onclick="goBack()">⬅ Back to Dashboard</button>
+  </div>
+
+  <script>
+    async function loadMedicalRecords() {
+      const token = localStorage.getItem("token");
+      const error = document.getElementById("error");
+      const container = document.getElementById("recordsContainer");
+
+      if (!token) {
+        error.textContent = "No token found. Please log in again.";
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/patient/records", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!res.ok) throw new Error("Failed to fetch records");
+
+        const records = await res.json();
+        container.innerHTML = "";
+
+        if (records.length === 0) {
+          container.innerHTML = "<p style='text-align:center;'>No medical records found.</p>";
+          return;
+        }
+
+        records.forEach(rec => {
+          const card = document.createElement("div");
+          card.className = "record-card";
+          card.innerHTML = `
+            <div class="record-details">
+              <div><span class="label">📂 Type:</span> <span class="value">${rec.record_type}</span></div>
+              <div><span class="label">📝 Description:</span> <span class="value">${rec.description}</span></div>
+              <div><span class="label">📅 Created:</span> <span class="value">${new Date(rec.created_at).toLocaleDateString()}</span></div>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+
+      } catch (err) {
+        console.error(err);
+        error.textContent = "Unable to load records.";
+      }
+    }
+
+    function goBack() {
+      const role = localStorage.getItem("userRole");
+      if (role === "patient") {
+        window.location.href = "../patient-dashboard.html";
+      } else {
+        alert("Unauthorized access.");
+      }
+    }
+
+    window.onload = loadMedicalRecords;
+  </script>
+</body>
+</html>

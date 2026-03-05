@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>My Appointments</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f2f4f8;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #ffffff;
+      border-radius: 10px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 30px;
+    }
+
+    #error {
+      color: red;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .appointment-card {
+      border: 1px solid #ddd;
+      border-left: 5px solid #3b82f6;
+      padding: 15px 20px;
+      margin-bottom: 15px;
+      border-radius: 6px;
+      background: #f9fafb;
+      transition: 0.3s ease;
+    }
+
+    .appointment-card:hover {
+      background: #eef2ff;
+    }
+
+    .appointment-details {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .appointment-details div {
+      margin-bottom: 8px;
+    }
+
+    .label {
+      font-weight: 600;
+      color: #555;
+    }
+
+    .value {
+      color: #111;
+    }
+
+    button {
+      display: block;
+      margin: 30px auto 0;
+      padding: 10px 20px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: 0.2s ease-in-out;
+    }
+
+    button:hover {
+      background: #2563eb;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📅 My Appointments</h1>
+    <p id="error"></p>
+    <div id="appointmentsContainer"></div>
+    <button onclick="goBack()">⬅ Back to Dashboard</button>
+  </div>
+
+  <script>
+    async function loadAppointments() {
+      const token = localStorage.getItem("token");
+      const error = document.getElementById("error");
+      const container = document.getElementById("appointmentsContainer");
+
+      if (!token) {
+        error.textContent = "No token found. Please login again.";
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/patient/appointments", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!res.ok) throw new Error("Failed to fetch appointments");
+
+        const appointments = await res.json();
+        container.innerHTML = "";
+
+        if (appointments.length === 0) {
+          container.innerHTML = "<p style='text-align:center;'>No appointments found.</p>";
+          return;
+        }
+
+        appointments.forEach(app => {
+          const card = document.createElement("div");
+          card.className = "appointment-card";
+          card.innerHTML = `
+            <div class="appointment-details">
+              <div><span class="label">📅 Date:</span> <span class="value">${new Date(app.appointment_date).toLocaleDateString()}</span></div>
+              <div><span class="label">⏰ Time:</span> <span class="value">${app.appointment_time}</span></div>
+              <div><span class="label">📌 Status:</span> <span class="value">${app.status}</span></div>
+              <div><span class="label">📝 Notes:</span> <span class="value">${app.notes}</span></div>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+
+      } catch (err) {
+        console.error(err);
+        error.textContent = "Unable to load appointments.";
+      }
+    }
+
+    function goBack() {
+      const role = localStorage.getItem("userRole");
+      if (role === "patient") {
+        window.location.href = "../patient-dashboard.html";
+      } else {
+        alert("Unauthorized access.");
+      }
+    }
+
+    window.onload = loadAppointments;
+  </script>
+</body>
+</html>

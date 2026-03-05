@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Doctor Dashboard</title>
+  <style>
+    body {
+      background: #f4f6f8;
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .dashboard-box {
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      text-align: center;
+      width: 90%;
+      max-width: 500px;
+    }
+    h1 {
+      margin-bottom: 20px;
+      color: #2d4d91;
+    }
+    button {
+      display: block;
+      width: 100%;
+      margin: 10px 0;
+      padding: 12px;
+      background: #2d4d91;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background: #1b366c;
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-box">
+    <h1>Welcome, Doctor</h1>
+
+    <button onclick="goTo('doctor/view-patients.html')">View Patients</button>
+    <button onclick="goTo('doctor/medical-records.html')">View/Update Medical Records</button>
+    <button onclick="goTo('doctor/prescriptions.html')">View/Update Prescriptions</button>
+    <button onclick="goTo('doctor/doctor-appointments.html')">Appointments</button>
+
+    <hr>
+
+    <button onclick="goTo('doctor/patient-answers.html')">View Patient Answers</button>
+    <button onclick="goTo('doctor/suggested-questions.html')">Suggest New Questions</button>
+
+    <hr>
+
+    <button onclick="goTo('doctor/view-plans.html')">View Plans</button>
+    <button onclick="goTo('doctor/my-subscription.html')">My Subscription</button>
+    <button onclick="goTo('doctor/my-time-slots.html')">My Time Slots</button>
+    <button onclick="goTo('doctor/update-subscription.html')">Update Subscription</button>
+    <button onclick="goTo('doctor/my-time-slots.html')">My Time Slots</button>
+
+    <hr>
+
+    <button onclick="goTo('doctor/insurance-doctor.html')">Insurance Management</button>
+
+    <hr>
+
+    <button onclick="goTo('view-profile.html')">View Profile</button>
+    <button onclick="goTo('update-profile.html')">Update Profile</button>
+    <button onclick="logout()">Logout</button>
+  </div>
+
+  <script>
+    function goTo(path) {
+      window.location.href = path;
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+
+    if (token) {
+      localStorage.setItem('token', token);
+
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        if (payload.role) localStorage.setItem('userRole', payload.role);
+        if (payload.id) localStorage.setItem('userId', payload.id);
+      } catch (err) {
+        console.error('Failed to decode token:', err.message);
+      }
+
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    function logout() {
+      localStorage.clear();
+      window.location.href = 'login.html';
+    }
+  </script>
+</body>
+</html>

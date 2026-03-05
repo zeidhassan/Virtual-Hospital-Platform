@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Doctor Appointments</title>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7fa; padding: 30px; }
+    h2 { text-align: center; color: #333; }
+    table { width: 100%; border-collapse: collapse; margin-top: 30px; }
+    th, td { padding: 12px; border-bottom: 1px solid #ddd; text-align: center; }
+    th { background-color: #4A90E2; color: white; }
+    tr:hover { background-color: #f1f1f1; }
+    .status.pending { color: orange; font-weight: bold; }
+    .status.confirmed { color: green; font-weight: bold; }
+    .status.completed { color: blue; font-weight: bold; }
+    .status.cancelled { color: red; font-weight: bold; }
+    textarea, select, button { padding: 6px; border-radius: 6px; }
+    textarea { resize: vertical; }
+    .back-btn { margin-top: 30px; display: block; margin-left: auto; margin-right: auto; padding: 10px 20px; background-color: #4A90E2; color: white; border: none; border-radius: 8px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h2>Manage Appointments</h2>
+  <table id="appointmentsTable">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Time</th>
+        <th>Patient</th>
+        <th>Status</th>
+        <th>Update Status</th>
+        <th>Record Type</th>
+        <th>Medical Notes</th>
+        <th>Add Record</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <button class="back-btn" onclick="location.href='../doctor-dashboard.html'">⬅ Back to Dashboard</button>
+
+  <script>
+    function authHeaders() {
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + localStorage.getItem('token')
+      };
+    }
+
+    async function loadAppointments() {
+      const res = await fetch('/api/doctor/appointments', { headers: authHeaders() });
+      const appointments = await res.json();
+      const tbody = document.querySelector('#appointmentsTable tbody');
+      tbody.innerHTML = '';
+
+      appointments.forEach(app => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${app.appointment_date}</td>
+          <td>${app.appointment_start_time} - ${app.appointment_end_time}</td>
+          <td>${app.patient_name}</td>
+          <td class="status ${app.status.toLowerCase()}">${app.status}</td>
+          <td>
+            <select onchange="updateStatus(${app.id}, this.value)">
+              <option value="">--Change--</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </td>
+          <td>
+            <select id="type-${app.id}">
+              <option value="">--Type--</option>
+              <option value="diagnosis">Diagnosis</option>
+              <option value="lab">Lab</option>
+              <option value="scan">Scan</option>
+              <option value="prescription">Prescription</option>
+              <option value="follow-up">Follow-up</option>
+              <option value="vaccination">Vaccination</option>
+            </select>
+          </td>
+          <td><textarea id="desc-${app.id}" rows="2" cols="20"></textarea></td>
+          <td><button onclick="submitRecord(${app.id})">Add</button></td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    async function updateStatus(id, status) {
+      if (!status) return;
+      const res = await fetch(`/api/doctor/appointments/${id}/status`, {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify({ status })
+      });
+      const result = await res.json();
+      alert(result.message || 'Status updated');
+      loadAppointments();
+    }
+
+    async function submitRecord(appointmentId) {
+      const type = document.getElementById(`type-${appointmentId}`).value;
+      const desc = document.getElementById(`desc-${appointmentId}`).value;
+
+      if (!type || !desc) return alert('Please enter both type and description.');
+
+      const res = await fetch(`/api/doctor/appointments/${appointmentId}/records`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ record_type: type, description: desc })
+      });
+
+      const result = await res.json();
+      alert(result.message || 'Record added.');
+      loadAppointments();
+    }
+
+    window.onload = loadAppointments;
+  </script>
+</body>
+</html>
