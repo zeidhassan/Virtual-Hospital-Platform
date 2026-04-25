@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
+    "dev": "concurrently --names \"API,WEB\" --prefix-colors \"cyan,magenta\" --kill-others \"nodemon server.js\" \"npm run dev --prefix frontend\"",
+    "start": "node server.js",
+    "refresh": "touch server.js",
+    "restart": "pkill -f nodemon; pkill -f vite; npm run dev",
     "test": "cross-env NODE_ENV=test jest ",
     "watch": "cross-env NODE_ENV=test jest --runInBand --watch",
     "coverage": "cross-env NODE_ENV=test jest --runInBand --coverage  --collectCoverageFrom='src/{config,controllers,middleware,routes,utils,validators}/**/*.js'"
@@ -36,8 +40,10 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "concurrently": "^9.2.1",
     "cross-env": "^7.0.3",
     "jest": "^29.7.0",
+    "nodemon": "^3.1.14",
     "supertest": "^7.1.1"
   }
 }

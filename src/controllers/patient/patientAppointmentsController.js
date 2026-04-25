@@ -149,30 +149,32 @@ exports.createAppointment = async (req, res) => {
         );
       }
 
-      const allowedRecordTypes = ['diagnosis', 'lab', 'scan', 'follow-up', 'vaccination'];
+      if (type) {
+        const allowedRecordTypes = ['diagnosis', 'lab', 'scan', 'follow-up', 'vaccination'];
 
-      if (!allowedRecordTypes.includes(type.toLowerCase())) {
-        return res.status(400).json({
-          error: `Invalid record type. Allowed types are: ${allowedRecordTypes.join(', ')}`
-        });
-      }
+        if (!allowedRecordTypes.includes(type.toLowerCase())) {
+          return res.status(400).json({
+            error: `Invalid record type. Allowed types are: ${allowedRecordTypes.join(', ')}`
+          });
+        }
 
-      const encryptedDescription = encrypt(description);
+        const encryptedDescription = encrypt(description);
 
-      if (req.file) {
-        const filePath = `uploads/medical-records/${req.file.filename}`;
-        await pool.query(
-          `INSERT INTO medical_records (patient_id, doctor_id, appointment_id, record_type, description, file_url, created_at, private)
-           VALUES ($1, $2, $3, $4, $5, $6, NOW(), FALSE)`,
-          [
-            patient_id,
-            doctor_id,
-            appointment_id,
-            type,
-            encryptedDescription || 'No description provided',
-            filePath
-          ]
-        );
+        if (req.file) {
+          const filePath = `uploads/medical-records/${req.file.filename}`;
+          await pool.query(
+            `INSERT INTO medical_records (patient_id, doctor_id, appointment_id, record_type, description, file_url, created_at, private)
+             VALUES ($1, $2, $3, $4, $5, $6, NOW(), FALSE)`,
+            [
+              patient_id,
+              doctor_id,
+              appointment_id,
+              type,
+              encryptedDescription || 'No description provided',
+              filePath
+            ]
+          );
+        }
       }
 
       res.status(201).json(insertResult.rows[0]);

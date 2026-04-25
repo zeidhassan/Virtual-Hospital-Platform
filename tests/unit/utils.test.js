@@ -20,8 +20,11 @@ describe('Encrypt/Decrypt Utils', () => {
     expect(decrypted).toBe(text);
   });
 
-  test('should throw error if decrypt input is malformed', () => {
-    expect(() => decrypt('invalid')).toThrow();
+  test('should return empty string if decrypt input is malformed', () => {
+    // decrypt now has a try/catch — malformed input returns '' instead of throwing
+    expect(decrypt('invalid')).toBe('');
+    expect(decrypt(null)).toBe('');
+    expect(decrypt('')).toBe('');
   });
 
   test('should throw if ENCRYPTION_KEY is not set', () => {

@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const handleDbError = require('../../utils/handleDbError');
 const paginate = require('../../utils/pagination'); // Pagination utility
 
 // Get all insurance requests
@@ -51,7 +52,7 @@ exports.getInsuranceRequestsById = async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Insurance request not found' });
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -65,7 +66,7 @@ exports.createInsuranceRequests = async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -81,7 +82,7 @@ exports.updateInsuranceRequests = async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Insurance request not found' });
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -93,6 +94,6 @@ exports.deleteInsuranceRequests = async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Insurance request not found' });
     res.json({ message: 'Insurance request deleted', request: result.rows[0] });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };

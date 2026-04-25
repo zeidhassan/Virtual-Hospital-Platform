@@ -1,4 +1,5 @@
 const pool = require('../../config/db'); // PostgreSQL connection pool
+const handleDbError = require('../../utils/handleDbError');
 const paginate = require('../../utils/pagination'); // Pagination utility
 
 // GET all messages (admin only)
@@ -53,7 +54,7 @@ exports.getMessageById = async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -74,7 +75,7 @@ exports.createMessage = async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -98,7 +99,7 @@ exports.updateMessage = async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -117,6 +118,6 @@ exports.deleteMessage = async (req, res) => {
 
     res.json({ message: 'Message deleted successfully' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };

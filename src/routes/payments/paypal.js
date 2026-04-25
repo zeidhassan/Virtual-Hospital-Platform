@@ -29,7 +29,7 @@ router.use(verifyToken);
  *               value:
  *                 amount: "10.00"
  *                 currency_code: "USD"
- *                 description: "Virtual Hospital Platform test payment"
+ *                 description: "HelixaCare test payment"
  *     responses:
  *       '200':
  *         description: Order created

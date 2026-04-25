@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply text-text-primary antialiased;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  body {
+    @apply bg-surface-muted min-h-screen;
+  }
+
+  *:focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-500 rounded-sm;
+  }
+
+  *:focus:not(:focus-visible) {
+    @apply outline-none;
+  }
+}
+
+@layer components {
+  .page-container {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8;
+  }
+
+  .page-title {
+    @apply text-2xl sm:text-3xl font-bold text-text-primary;
+  }
+
+  .section-title {
+    @apply text-lg font-semibold text-text-primary;
+  }
+
+  .card {
+    @apply bg-surface rounded-card shadow-card p-5 sm:p-6;
+  }
+
+  .card-hoverable {
+    @apply card transition-shadow duration-200 hover:shadow-card-hover;
+  }
+}

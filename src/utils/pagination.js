@@ -19,7 +19,7 @@ const VALID_SORT_COLUMNS = {
   messages: ['id', 'sender_id', 'receiver_id', 'message', 'timestamp', 'is_read'],
   notifications: ['id', 'user_id', 'title', 'body', 'is_read', 'created_at'],
   medications: ['id', 'name', 'type', 'description', 'price'],
-  pharmacy_orders: ['id', 'patient_id', 'medications', 'total_amount', 'status', 'prescription_file', 'ordered_at'],
+  pharmacy_orders: ['id', 'patient_id', 'prescription_id', 'medications', 'quantities', 'total_amount', 'status', 'prescription_file', 'delivery_address', 'payment_method', 'ordered_at'],
   question_bank: ['id', 'question_text', 'question_type', 'specialty', 'suggested_by', 'is_approved', 'created_at'],
   patient_question_responses: ['id', 'patient_id', 'question_id', 'answer', 'created_at'],
   doctor_response_notes: ['id', 'doctor_id', 'response_id', 'note', 'created_at'],
@@ -30,6 +30,8 @@ const VALID_SORT_COLUMNS = {
   support_ticket_replies: ['id', 'ticket_id', 'user_id', 'message', 'file_url', 'doctor_assigned', 'patient_assigned', 'created_at'],
   services: ['id', 'name', 'description', 'cost'],
   health_programs: ['id', 'name', 'description', 'start_date', 'end_date', 'eligibility'],
+  follow_up_schedules: ['id', 'patient_id', 'doctor_id', 'appointment_id', 'triage_session_id', 'created_by', 'scheduled_date', 'notes', 'status', 'reminder_sent', 'created_at'],
+  health_logs: ['id', 'patient_id', 'log_type', 'data', 'notes', 'logged_at'],
 };
 
 module.exports = async function paginate({

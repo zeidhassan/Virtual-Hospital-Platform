@@ -18,6 +18,7 @@ exports.getDoctorAppointments = async (req, res) => {
     const sort = req.query.sort || '-appointment_date';
 
     const validColumns = [
+      "appointment_id",
       "patient_id",
       "appointment_date",
       "appointment_start_time",
@@ -114,7 +115,7 @@ exports.getAppointmentRecords = async (req, res) => {
     // Pagination
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const private = req.query.private || undefined;
+    const isPrivate = req.query.private || undefined;
 
     const result = await paginate({
       table: 'medical_records mr',
@@ -135,7 +136,7 @@ exports.getAppointmentRecords = async (req, res) => {
       `,
       filters: {
         'appointment_id': appointmentId,
-        'private': private
+        'private': isPrivate
       },
     });
 
@@ -163,7 +164,7 @@ exports.addMedicalRecord = async (req, res) => {
 
     const userId = req.user.id;
     const { appointmentId } = req.params;
-    const { type, description, private } = req.body;
+    const { type, description, private: isPrivate } = req.body;
 
     const doctorResult = await pool.query('SELECT id FROM doctors WHERE user_id = $1', [userId]);
     if (doctorResult.rows.length === 0) return res.status(404).json({ error: 'Doctor not found.' });
@@ -213,7 +214,7 @@ exports.addMedicalRecord = async (req, res) => {
             type,
             encryptedDescription || 'No description provided',
             filePath,
-            private
+            isPrivate
           ]
         );
       } else {
@@ -227,7 +228,7 @@ exports.addMedicalRecord = async (req, res) => {
             appointmentId,
             type,
             encryptedDescription || 'No description provided',
-            private
+            isPrivate
           ]
         );
       }
@@ -329,7 +330,7 @@ async function generateMedicalRecordFile(recordType, text, doctorId, patientId, 
 exports.generateMedicalRecord = async (req, res) => {
   const userId = req.user.id;
   const { appointmentId } = req.params;
-  let { type, text, private } = req.body;
+  let { type, text, private: isPrivate } = req.body;
   try {
     // Validation: Doctor and Appointment Auth
     const doctorResult = await pool.query('SELECT id FROM doctors WHERE user_id = $1', [userId]);
@@ -367,7 +368,7 @@ exports.generateMedicalRecord = async (req, res) => {
         type,
         encrypt(description),
         filePath,
-        private
+        isPrivate
       ]
     );
 
@@ -390,7 +391,7 @@ exports.addPrescription = async (req, res) => {
   if (doctorResult.rows.length === 0) return res.status(404).json({ error: 'Doctor not found.' });
   const doctorId = doctorResult.rows[0].id;
 
-  const appointmentCheck = await pool.query('SELECT * FROM appointments WHERE id = $1 AND doctor_id = $2', [id, doctorId]);
+  const appointmentCheck = await pool.query('SELECT * FROM appointments WHERE id = $1 AND doctor_id = $2', [appointmentId, doctorId]);
   if (appointmentCheck.rows.length === 0) return res.status(403).json({ error: 'Unauthorized.' });
 
   try {

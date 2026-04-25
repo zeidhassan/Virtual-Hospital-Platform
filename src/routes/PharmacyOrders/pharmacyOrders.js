@@ -3,72 +3,76 @@ const router = express.Router();
 const controller = require('../../controllers/PharmacyOrders/pharmacyOrderController');
 const requireRole = require('../../middleware/requireRole');
 const verifyToken = require('../../middleware/verifyToken');
+const { uploadPrescription } = require('../../middleware/uploadMiddleware');
 
-// GET all orders (admin only)
 /**
  * @swagger
- * /api/pharmacy-orders:
+ * /api/pharmacy-orders/medications/list:
  *   get:
- *     summary: Get all pharmacy orders (admin only)
- *     tags: [Pharmacy Orders]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of pharmacy orders
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: integer
- *                   patient_id:
- *                     type: integer
- *                   medications:
- *                     type: string
- *                   total_amount:
- *                     type: number
- *                   status:
- *                     type: string
- *                   prescription_file:
- *                     type: string
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden
- */
-router.get('/', verifyToken, requireRole('admin'), controller.getAllOrders);
-
-// GET patient orders
-/**
- * @swagger
- * /api/pharmacy-orders/patient/{patient_id}:
- *   get:
- *     summary: Get pharmacy orders for a specific patient
+ *     summary: Get medications catalog (all authenticated roles)
  *     tags: [Pharmacy Orders]
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: patient_id
- *         required: true
- *         schema:
- *           type: integer
+ *       - in: query
+ *         name: name
+ *         schema: { type: string }
+ *       - in: query
+ *         name: type
+ *         schema: { type: string, enum: [countertop, prescription] }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 100 }
  *     responses:
  *       200:
- *         description: Patient order history
+ *         description: Paginated medications list
  */
-router.get('/patient/:id', verifyToken, requireRole('patient'), controller.getOrdersByPatient);
+router.get('/medications/list', verifyToken, controller.getMedications);
 
-// POST new order
+/**
+ * @swagger
+ * /api/pharmacy-orders/my:
+ *   get:
+ *     summary: Get authenticated patient's own orders
+ *     tags: [Pharmacy Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Paginated order list
+ */
+router.get('/my', verifyToken, requireRole('patient'), controller.getMyOrders);
+
+/**
+ * @swagger
+ * /api/pharmacy-orders:
+ *   get:
+ *     summary: Get all pharmacy orders (admin/doctor)
+ *     tags: [Pharmacy Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: patient
+ *         schema: { type: string }
+ *       - in: query
+ *         name: status
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Paginated orders
+ */
+router.get('/', verifyToken, requireRole(['admin', 'doctor']), controller.getAllOrders);
+
 /**
  * @swagger
  * /api/pharmacy-orders:
  *   post:
- *     summary: Create a new pharmacy order
+ *     summary: Place a pharmacy order (patient)
  *     tags: [Pharmacy Orders]
  *     security:
  *       - bearerAuth: []
@@ -76,35 +80,37 @@ router.get('/patient/:id', verifyToken, requireRole('patient'), controller.getOr
  *       - in: query
  *         name: medications
  *         required: true
- *         schema:
- *           type: string
- *         description: Comma-separated list of medication names
+ *         schema: { type: string }
+ *         description: Comma-separated medication names
+ *       - in: query
+ *         name: quantities
+ *         schema: { type: string }
+ *         description: Comma-separated quantities (matches medication order)
  *     requestBody:
- *       required: false
+ *       required: true
  *       content:
  *         multipart/form-data:
  *           schema:
  *             type: object
+ *             required: [delivery_address]
  *             properties:
- *               prescription_file:
- *                 type: string
- *                 format: binary
+ *               delivery_address: { type: string }
+ *               payment_method: { type: string, enum: [cash, card, insurance] }
+ *               prescription_file: { type: string, format: binary }
+ *               prescription_id: { type: integer }
  *     responses:
  *       201:
- *         description: Order created successfully
+ *         description: Order created
  *       400:
- *         description: Missing or invalid input
- *       401:
- *         description: Unauthorized
+ *         description: Validation error
  */
-router.post('/', verifyToken, requireRole('patient'), controller.createOrder);
+router.post('/', verifyToken, requireRole('patient'), uploadPrescription.single('prescription_file'), controller.createOrder);
 
-// PUT update status
 /**
  * @swagger
- * /api/pharmacy-orders/{orderId}:
+ * /api/pharmacy-orders/{orderId}/cancel:
  *   put:
- *     summary: Update the status of a pharmacy order
+ *     summary: Cancel a pending order (patient)
  *     tags: [Pharmacy Orders]
  *     security:
  *       - bearerAuth: []
@@ -112,36 +118,22 @@ router.post('/', verifyToken, requireRole('patient'), controller.createOrder);
  *       - in: path
  *         name: orderId
  *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               new_status:
- *                 type: string
- *                 example: Shipped
+ *         schema: { type: integer }
  *     responses:
  *       200:
- *         description: Order status updated
+ *         description: Order cancelled
  *       400:
- *         description: Invalid input
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Server error
+ *         description: Order is not pending
+ *       403:
+ *         description: Not your order
  */
-router.put('/:orderId', verifyToken, requireRole('admin'), controller.updateOrderStatus);
+router.put('/:orderId/cancel', verifyToken, requireRole('patient'), controller.cancelOrder);
 
-// GET medication list (all roles)
 /**
  * @swagger
  * /api/pharmacy-orders/{orderId}:
- *   put:
- *     summary: Update the status of a pharmacy order
+ *   get:
+ *     summary: Get a single order by ID
  *     tags: [Pharmacy Orders]
  *     security:
  *       - bearerAuth: []
@@ -149,29 +141,49 @@ router.put('/:orderId', verifyToken, requireRole('admin'), controller.updateOrde
  *       - in: path
  *         name: orderId
  *         required: true
- *         schema:
- *           type: integer
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Order details
+ *       403:
+ *         description: Access denied
+ *       404:
+ *         description: Order not found
+ */
+router.get('/:orderId', verifyToken, controller.getOrderById);
+
+/**
+ * @swagger
+ * /api/pharmacy-orders/{orderId}:
+ *   put:
+ *     summary: Update order status (admin/doctor)
+ *     tags: [Pharmacy Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema: { type: integer }
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required: [new_status]
  *             properties:
  *               new_status:
  *                 type: string
- *                 example: Shipped
+ *                 enum: [pending, processing, dispatched, delivered, cancelled]
  *     responses:
  *       200:
- *         description: Order status updated
+ *         description: Status updated
  *       400:
- *         description: Invalid input
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Server error
+ *         description: Invalid status
+ *       404:
+ *         description: Order not found
  */
-router.get('/medications/list', verifyToken, requireRole(['patient', 'doctor', 'admin']), controller.getMedications);
-
+router.put('/:orderId', verifyToken, requireRole(['admin', 'doctor']), controller.updateOrderStatus);
 
 module.exports = router;

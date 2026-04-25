@@ -4,7 +4,7 @@ const { encrypt, decrypt } = require('../../utils/encrypt');
 
 // POST /prescriptions
 exports.addPrescription = async (req, res) => {
-  const { appointmentId } = req.params;
+  const appointmentId = req.body.appointment_id;
   const { medication, dosage, pack_limit, instructions, issued_date } = req.body;
 
   try {

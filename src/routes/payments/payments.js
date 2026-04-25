@@ -1,63 +1,29 @@
 const express = require('express');
 const router = express.Router();
-const { createOrder, captureOrder } = require('../../controllers/payments/paymentsController');
+const verifyToken = require('../../middleware/verifyToken');
 const requireRole = require('../../middleware/requireRole');
-const verifyToken = require('../../middleware/verifyToken')
+const { getFpxBanks, getMyBills, payBill, getMyTransactions } = require('../../controllers/payments/paymentsController');
+const { listMethods, saveMethod, setDefault, deleteMethod } = require('../../controllers/payments/paymentMethodsController');
+const { getBillingAddress, saveBillingAddress } = require('../../controllers/payments/billingAddressController');
+
 router.use(verifyToken);
 
-/**
- * @swagger
- * /api/payments/create-order:
- *   post:
- *     summary: Create a new PayPal order
- *     tags: [Billing]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               amount:
- *                 type: string
- *                 example: "29.99"
- *     responses:
- *       200:
- *         description: Order created successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 id:
- *                   type: string
- *       500:
- *         description: Server error
- */
-router.post('/create-order', requireRole('patient'), createOrder);
+// FPX bank list
+router.get('/fpx-banks', getFpxBanks);
 
-/**
- * @swagger
- * /api/payments/capture-order:
- *   post:
- *     summary: Capture an approved PayPal order
- *     tags: [Billing]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               orderID:
- *                 type: string
- *                 example: "5O190127TN364715T"
- *     responses:
- *       200:
- *         description: Order captured successfully
- *       500:
- *         description: Server error
- */
-router.post('/capture-order', captureOrder);
+// Patient bill payment
+router.get('/bills/my', requireRole('patient'), getMyBills);
+router.post('/pay', requireRole('patient'), payBill);
+router.get('/transactions', getMyTransactions);
+
+// Saved payment methods (all roles)
+router.get('/methods', listMethods);
+router.post('/methods', saveMethod);
+router.put('/methods/:id/default', setDefault);
+router.delete('/methods/:id', deleteMethod);
+
+// Billing address (all roles)
+router.get('/billing-address', getBillingAddress);
+router.post('/billing-address', saveBillingAddress);
 
 module.exports = router;

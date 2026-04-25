@@ -53,25 +53,6 @@ router.get('/plans', verifyToken, doctorSubscriptionController.getDoctorPlans);
 router.post('/subscribe', verifyToken, doctorSubscriptionController.createDoctorSubscription);
 /**
  * @swagger
- * /doctor/doctor-subscriptions/webhook:
- *   post:
- *     summary: Handle PayPal webhook for doctor subscriptions
- *     tags:
- *       - Doctor - Subscriptions
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *     responses:
- *       200:
- *         description: Webhook processed
- */
-// POST webhook for doctor subscriptions
-router.post('/webhook', express.json(), doctorSubscriptionController.handleDoctorPaypalWebhook);
-/**
- * @swagger
  * /doctor/doctor-subscriptions/current:
  *   get:
  *     summary: Get the current subscription for the authenticated doctor

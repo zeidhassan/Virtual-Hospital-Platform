@@ -9,6 +9,7 @@ const loginLimiter = rateLimit({
   message: { error: 'Too many login attempts. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test', // disable in test env so account-lockout tests aren't blocked
 });
 
 // Moderate: OTP requests
@@ -29,8 +30,19 @@ const generalApiLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Triage assess endpoint — strict to prevent abuse
+const triageLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  message: { error: 'Too many triage requests. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test',
+});
+
 module.exports = {
   loginLimiter,
   otpLimiter,
   generalApiLimiter,
+  triageLimiter,
 };

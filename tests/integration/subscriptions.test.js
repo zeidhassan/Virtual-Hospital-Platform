@@ -15,30 +15,30 @@ jest.mock('../../src/middleware/requireRole', () => () => (req, res, next) => ne
 describe('Subscriptions API (Admin)', () => {
   afterEach(() => jest.clearAllMocks());
 
-  test('GET /api/subscriptions - should return all subscriptions', async () => {
-    pool.query.mockResolvedValueOnce({
-      rows: [
+  test('GET /api/adminBoard/subscriptions - should return all subscriptions', async () => {
+    // paginate() makes two queries: data then count
+    pool.query
+      .mockResolvedValueOnce({ rows: [
         { id: 1, user_id: 101, plan_id: 1 },
         { id: 2, user_id: 102, plan_id: 2 }
-      ]
-    });
+      ]})
+      .mockResolvedValueOnce({ rows: [{ total: '2' }] });
 
     const res = await request(app)
-      .get('/api/subscriptions')
+      .get('/api/adminBoard/subscriptions')
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.statusCode).toBe(200);
-    expect(res.body.length).toBe(2);
-    expect(pool.query).toHaveBeenCalledWith('SELECT * FROM subscriptions ORDER BY id');
+    expect(res.body.data.length).toBe(2);
   });
 
-  test('GET /api/subscriptions/:id - found', async () => {
+  test('GET /api/adminBoard/subscriptions/:id - found', async () => {
     pool.query.mockResolvedValueOnce({
       rows: [{ id: 1, user_id: 101, plan_id: 1 }]
     });
 
     const res = await request(app)
-      .get('/api/subscriptions/1')
+      .get('/api/adminBoard/subscriptions/1')
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.statusCode).toBe(200);
@@ -46,11 +46,11 @@ describe('Subscriptions API (Admin)', () => {
     expect(pool.query).toHaveBeenCalledWith('SELECT * FROM subscriptions WHERE id = $1', ['1']);
   });
 
-  test('GET /api/subscriptions/:id - not found', async () => {
+  test('GET /api/adminBoard/subscriptions/:id - not found', async () => {
     pool.query.mockResolvedValueOnce({ rows: [] });
 
     const res = await request(app)
-      .get('/api/subscriptions/999')
+      .get('/api/adminBoard/subscriptions/999')
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.statusCode).toBe(404);

@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const handleDbError = require('../../utils/handleDbError');
 const paginate = require('../../utils/pagination'); // Pagination utility
 
 // Get all doctor subscriptions
@@ -52,7 +53,7 @@ exports.getDoctorSubscriptionsById = async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Doctor subscription not found' });
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -66,7 +67,7 @@ exports.createDoctorSubscriptions = async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -82,7 +83,7 @@ exports.updateDoctorSubscriptions = async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Doctor subscription not found' });
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -94,6 +95,6 @@ exports.deleteDoctorSubscriptions = async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Doctor subscription not found' });
     res.json({ message: 'Doctor subscription deleted', subscription: result.rows[0] });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };

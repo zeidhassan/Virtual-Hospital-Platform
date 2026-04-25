@@ -6,7 +6,7 @@ describe('Admin Stats API Tests', () => {
 
   beforeAll(async () => {
     const res = await request(app).post('/api/auth/login').send({
-      email: 'admin@virtualhospitalplatform.com',
+      email: 'admin@helixacare.com',
       password: 'admin123'
     });
     token = res.body.token;

@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const handleDbError = require('../../utils/handleDbError');
 const paginate = require('../../utils/pagination'); // Pagination utility
 
 // Get all doctor plans
@@ -48,7 +49,7 @@ exports.getDoctorPlansById = async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Doctor plan not found' });
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 // Helper to safely normalize the features string into a JS object
@@ -82,7 +83,7 @@ exports.createDoctorPlans = async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -106,7 +107,7 @@ exports.updateDoctorPlans = async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -118,6 +119,6 @@ exports.deleteDoctorPlans = async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Doctor plan not found' });
     res.json({ message: 'Doctor plan deleted', plan: result.rows[0] });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };

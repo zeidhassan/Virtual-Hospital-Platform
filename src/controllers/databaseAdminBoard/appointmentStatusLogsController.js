@@ -1,4 +1,5 @@
 const pool = require('../../config/db');
+const handleDbError = require('../../utils/handleDbError');
 const paginate = require('../../utils/pagination'); // Pagination utility
 
 exports.getAll = async (req, res) => {
@@ -43,7 +44,7 @@ exports.getById = async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Log not found' });
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -57,7 +58,7 @@ exports.create = async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -73,7 +74,7 @@ exports.update = async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Log not found' });
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -83,6 +84,6 @@ exports.remove = async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Log not found' });
     res.json({ message: 'Log deleted successfully' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };

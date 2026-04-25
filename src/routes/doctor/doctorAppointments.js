@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const doctorAppointmentsController = require('../../controllers/doctor/doctorAppointmentsController');
-const { validateAddPrescription } = require('../../validators/prescriptionsValidation')
+const { validateDoctorPrescription } = require('../../validators/prescriptionsValidation')
 const verifyToken = require('../../middleware/verifyToken');
 
 router.use(verifyToken);
@@ -191,6 +191,6 @@ router.post('/:appointmentId/generate', doctorAppointmentsController.generateMed
  *       500:
  *         description: Server error
  */
-router.post('/:appointmentId/prescriptions', validateAddPrescription, doctorAppointmentsController.addPrescription);
+router.post('/:appointmentId/prescriptions', validateDoctorPrescription, doctorAppointmentsController.addPrescription);
 
 module.exports = router;

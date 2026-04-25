@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const handleDbError = require('../../utils/handleDbError');
 const paginate = require('../../utils/pagination'); // Pagination utility
 
 // Get all responses
@@ -46,7 +47,7 @@ exports.getPatientQuestionResponsesById = async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Response not found' });
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -60,7 +61,7 @@ exports.createPatientQuestionResponses = async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -76,7 +77,7 @@ exports.updatePatientQuestionResponses = async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Response not found' });
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -88,6 +89,6 @@ exports.deletePatientQuestionResponses = async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Response not found' });
     res.json({ message: 'Response deleted', response: result.rows[0] });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };

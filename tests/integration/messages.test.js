@@ -15,30 +15,30 @@ jest.mock('../../src/middleware/requireRole', () => () => (req, res, next) => ne
 describe('Messages API (Admin)', () => {
   afterEach(() => jest.clearAllMocks());
 
-  test('GET /api/messages - should return all messages', async () => {
-    pool.query.mockResolvedValueOnce({
-      rows: [
+  test('GET /api/adminBoard/messages - should return all messages', async () => {
+    // paginate() makes two queries: data then count
+    pool.query
+      .mockResolvedValueOnce({ rows: [
         { id: 1, subject: 'Hello', content: 'Welcome!' },
         { id: 2, subject: 'Notice', content: 'System update' }
-      ]
-    });
+      ]})
+      .mockResolvedValueOnce({ rows: [{ total: '2' }] });
 
     const res = await request(app)
-      .get('/api/messages')
+      .get('/api/adminBoard/messages')
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.statusCode).toBe(200);
-    expect(res.body.length).toBe(2);
-    expect(pool.query).toHaveBeenCalledWith('SELECT * FROM messages ORDER BY id');
+    expect(res.body.data.length).toBe(2);
   });
 
-  test('GET /api/messages/:id - found', async () => {
+  test('GET /api/adminBoard/messages/:id - found', async () => {
     pool.query.mockResolvedValueOnce({
       rows: [{ id: 1, subject: 'Hello', content: 'Welcome!' }]
     });
 
     const res = await request(app)
-      .get('/api/messages/1')
+      .get('/api/adminBoard/messages/1')
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.statusCode).toBe(200);
@@ -46,11 +46,11 @@ describe('Messages API (Admin)', () => {
     expect(pool.query).toHaveBeenCalledWith('SELECT * FROM messages WHERE id = $1', ['1']);
   });
 
-  test('GET /api/messages/:id - not found', async () => {
+  test('GET /api/adminBoard/messages/:id - not found', async () => {
     pool.query.mockResolvedValueOnce({ rows: [] });
 
     const res = await request(app)
-      .get('/api/messages/999')
+      .get('/api/adminBoard/messages/999')
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.statusCode).toBe(404);

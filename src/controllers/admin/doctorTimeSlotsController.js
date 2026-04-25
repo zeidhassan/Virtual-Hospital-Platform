@@ -16,7 +16,7 @@ exports.getAllDoctorTimeSlots = async (req, res) => {
         sortTable: 'u', // we want to sort by users.full_name
         page: req.query.page || 1,
         limit: req.query.limit || 20,
-        sort: req.query.sort || '+full_name', // sorted by name
+        sort: req.query.sort || '+id', // sorted by id (full_name is on users table, not in doctors VALID_SORT_COLUMNS)
         select: 'd.id, u.full_name AS doctor_name',
         join: 'JOIN users u ON d.user_id = u.id',
         // optional fuzzy search by name: ?q=ali

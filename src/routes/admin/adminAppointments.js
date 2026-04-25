@@ -117,4 +117,33 @@ router.delete('/:id', requireRole('admin'), controller.deleteAppointment);
  */
 router.put('/:id/reassign', requireRole('admin'), controller.reassignAppointment);
 
+/**
+ * @swagger
+ * /api/admin/appointments/{id}:
+ *   patch:
+ *     summary: Update appointment status or reschedule (admin only)
+ *     tags: [Admin Appointments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema: { type: integer }
+ *         required: true
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status: { type: string }
+ *               appointment_date: { type: string, format: date }
+ *               appointment_start_time: { type: string }
+ *               appointment_end_time: { type: string }
+ *     responses:
+ *       200:
+ *         description: Appointment updated
+ */
+router.patch('/:id', requireRole('admin'), controller.updateAppointment);
+
 module.exports = router;

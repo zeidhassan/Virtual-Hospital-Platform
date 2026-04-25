@@ -1,4 +1,5 @@
 const pool = require('../../config/db'); // PostgreSQL connection pool
+const handleDbError = require('../../utils/handleDbError');
 const paginate = require('../../utils/pagination'); // Pagination utility
 
 // GET all support ticket replies (admin only)
@@ -54,7 +55,7 @@ exports.getSupportTicketReplyById = async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -75,7 +76,7 @@ exports.createSupportTicketReply = async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -101,7 +102,7 @@ exports.updateSupportTicketReply = async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -120,6 +121,6 @@ exports.deleteSupportTicketReply = async (req, res) => {
 
     res.json({ message: 'Support ticket reply deleted successfully' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };

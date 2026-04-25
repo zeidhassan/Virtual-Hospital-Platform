@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const handleDbError = require('../../utils/handleDbError');
 const paginate = require('../../utils/pagination'); // Pagination utility
 
 // Get all time slots
@@ -45,7 +46,7 @@ exports.getDoctorTimeSlotsById = async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Time slot not found' });
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -89,7 +90,7 @@ exports.searchDoctorTimeSlots = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('[searchDoctorTimeSlots] Error:', err.message);
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -103,7 +104,7 @@ exports.createDoctorTimeSlots = async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -119,7 +120,7 @@ exports.updateDoctorTimeSlots = async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Time slot not found' });
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -131,6 +132,6 @@ exports.deleteDoctorTimeSlots = async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Time slot not found' });
     res.json({ message: 'Time slot deleted', slot: result.rows[0] });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };

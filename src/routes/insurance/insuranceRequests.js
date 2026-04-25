@@ -31,7 +31,73 @@ const requireRole = require('../../middleware/requireRole');
  *               items:
  *                 $ref: '#/components/schemas/InsuranceRequest'
  */
-// Doctor: View their pending requests
+/**
+ * @swagger
+ * /api/insurance-requests:
+ *   post:
+ *     summary: Patient submits a new insurance request
+ *     tags:
+ *       - Insurance - Requests
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - insurance_company
+ *               - insurance_id_number
+ *               - start_date
+ *               - end_date
+ *             properties:
+ *               insurance_company:
+ *                 type: string
+ *               insurance_id_number:
+ *                 type: string
+ *               start_date:
+ *                 type: string
+ *                 format: date
+ *               end_date:
+ *                 type: string
+ *                 format: date
+ *               doctor_id:
+ *                 type: integer
+ *               bill_id:
+ *                 type: integer
+ *     responses:
+ *       201:
+ *         description: Insurance request submitted
+ *       400:
+ *         description: Missing required fields
+ */
+// Patient: Submit new request
+router.post('/', verifyToken, requireRole('patient'), insuranceRequestsController.submitInsuranceRequest);
+
+/**
+ * @swagger
+ * /api/insurance-requests/my:
+ *   get:
+ *     summary: Get own insurance requests (patient, by token)
+ *     tags:
+ *       - Insurance - Requests
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of patient's own insurance requests
+ */
+// Patient: Get own requests by token
+router.get('/my', verifyToken, requireRole('patient'), insuranceRequestsController.getMyInsuranceRequests);
+
+// Patient: Check for active (accepted) insurance coverage
+router.get('/active', verifyToken, requireRole('patient'), insuranceRequestsController.getActiveInsurance);
+
+// Doctor: View their pending requests (token-based, no ID param needed)
+router.get('/doctor-pending', verifyToken, requireRole('doctor'), insuranceRequestsController.getDoctorInsuranceRequests);
+
+// Doctor: View their pending requests (legacy route with path param — controller uses token, not the param)
 router.get('/doctor/:id', verifyToken, insuranceRequestsController.getDoctorInsuranceRequests);
 /**
  * @swagger

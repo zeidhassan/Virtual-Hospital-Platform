@@ -1,10 +1,13 @@
 const express = require('express');
 const passport = require('passport');
 const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
 const { body, validationResult } = require('express-validator');
 const router = express.Router();
 const authController = require('../../controllers/authentication/authController');
 const { loginLimiter } = require('../../middleware/rateLimit');
+const verifyToken = require('../../middleware/verifyToken');
+const { getUserProfile } = require('../../controllers/authentication/profileController');
 
 const frontendUrl = process.env.FRONTEND_URL;
 
@@ -103,6 +106,40 @@ router.post('/register', validateRegister, registerLimiter, authController.regis
  */
 router.post('/login', validateLogin, loginLimiter, authController.loginUser);
 
+// @route   POST /api/auth/logout
+/**
+ * @swagger
+ * /api/auth/logout:
+ *   post:
+ *     summary: Log out and blacklist the current JWT
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logged out successfully
+ *       401:
+ *         description: No token provided
+ */
+router.post('/logout', verifyToken, authController.logoutUser);
+
+// @route   GET /api/auth/me
+/**
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: Get current authenticated user's profile
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile returned
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/me', verifyToken, getUserProfile);
+
 // GOOGLE LOGIN
 /**
  * @swagger
@@ -119,11 +156,12 @@ router.get('/google', passport.authenticate('google', { scope: ['profile', 'emai
 router.get('/google/callback',
   passport.authenticate('google', { session: false, failureRedirect: '/login.html' }),
   (req, res) => {
-    const token = jwt.sign({ id: req.user.id, role: req.user.role }, process.env.JWT_SECRET);
-
-    let redirectUrl = `${frontendUrl}/login-callback/google?token=${token}`;
-
-    res.redirect(redirectUrl);
+    const token = jwt.sign(
+      { id: req.user.id, role: req.user.role, jti: uuidv4() },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
+    res.redirect(`${frontendUrl}/login-callback/google?token=${token}`);
   }
 );
 
@@ -143,11 +181,12 @@ router.get('/facebook', passport.authenticate('facebook', { scope: ['email'] }))
 router.get('/facebook/callback',
   passport.authenticate('facebook', { session: false, failureRedirect: '/login.html' }),
   (req, res) => {
-    const token = jwt.sign({ id: req.user.id, role: req.user.role }, process.env.JWT_SECRET);
-
-    let redirectUrl = `${frontendUrl}/login-callback/facebook?token=${token}`;
-
-    res.redirect(redirectUrl);
+    const token = jwt.sign(
+      { id: req.user.id, role: req.user.role, jti: uuidv4() },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
+    res.redirect(`${frontendUrl}/login-callback/facebook?token=${token}`);
   }
 );
 

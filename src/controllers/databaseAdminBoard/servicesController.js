@@ -1,4 +1,5 @@
 const pool = require('../../config/db'); // PostgreSQL connection pool
+const handleDbError = require('../../utils/handleDbError');
 const paginate = require('../../utils/pagination'); // Pagination utility
 
 // GET all services (admin only)
@@ -51,7 +52,7 @@ exports.getServiceById = async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -72,7 +73,7 @@ exports.createService = async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -98,7 +99,7 @@ exports.updateService = async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -117,6 +118,6 @@ exports.deleteService = async (req, res) => {
 
     res.json({ message: 'Service deleted successfully' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };

@@ -28,7 +28,7 @@ exports.createOrder = async (req, res) => {
     // Pull/compute amount server-side from your plans/cart.
     const amount = String(req.body?.amount || '10.00');
     const currency = (req.body?.currency_code || process.env.PAYPAL_CURRENCY || 'USD').toUpperCase();
-    const description = req.body?.description || 'Virtual Hospital Platform payment';
+    const description = req.body?.description || 'HelixaCare payment';
 
     if (!/^\d+(\.\d{1,2})?$/.test(amount)) {
       return res.status(400).json({ error: 'Invalid amount format' });

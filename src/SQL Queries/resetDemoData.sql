@@ -1,5 +1,5 @@
 -- DROP ALL TABLES IF THEY EXIST
-DROP TABLE IF EXISTS users, doctors, patients, billing_addresses, payment_methods, appointments, doctor_time_slots, appointment_status_logs, prescriptions, medical_records, bills, plans, subscriptions, messages, notifications, medications, pharmacy_orders, question_bank, patient_question_responses, doctor_response_notes, doctor_plans, doctor_subscriptions, insurance_requests, insurance_requests, support_tickets, support_ticket_replies, services, health_programs, user_passwords CASCADE;
+DROP TABLE IF EXISTS payment_transactions, follow_up_schedules, health_logs, triage_sessions, triage_symptom_rules, token_blacklist, users, doctors, patients, billing_addresses, payment_methods, appointments, doctor_time_slots, appointment_status_logs, prescriptions, medical_records, bills, plans, subscriptions, messages, notifications, medications, pharmacy_orders, question_bank, patient_question_responses, doctor_response_notes, doctor_plans, doctor_subscriptions, insurance_requests, support_tickets, support_ticket_replies, services, health_programs, user_passwords CASCADE;
 
 -------------------------------------------------------------------------------------------
 
@@ -13,63 +13,73 @@ CREATE TABLE users (
     phone VARCHAR(20),
     gender VARCHAR(10),
     date_of_birth DATE,
+    login_attempts INT DEFAULT 0,
+    locked_until TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- TOKEN BLACKLIST TABLE (for JWT logout)
+CREATE TABLE token_blacklist (
+    id SERIAL PRIMARY KEY,
+    jti UUID UNIQUE NOT NULL,
+    user_id INT REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- SEEDED DATA
 INSERT INTO users (full_name, email, password_hash, role, phone, gender, date_of_birth) VALUES
-('Admin User', 'admin@virtualhospitalplatform.com', '$2b$10$Nm6Kfq7exRO4pdpznoK6lOYakzHUg6qWJXaAhv9xmgD77Do//4ksO', 'admin', '1111111111', 'other', '1980-01-01'),
-('Dr. Strange', 'strange@virtualhospitalplatform.com', '$2b$10$j8aygi5zKmczoRel7aMf7.d65DTI1KdVinoWnpMr4RiwRdWcURoPm', 'doctor', '2222222222', 'male', '1975-05-10'),
-('Jane Patient', 'jane@virtualhospitalplatform.com', '$2b$10$wX7.A1/wNDjPFtN490wLVuM5OHYZsFMmWH9n6EasJTmF1/ETm5lDS', 'patient', '3333333333', 'female', '1990-09-20'),
-('Dr. Meredith Grey', 'meredith@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '5555555555', 'female', '1983-02-14'),
-('Mark Spencer', 'mark@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '6666666666', 'male', '1988-07-30'),
-('Dr. Karev Alex', 'karev@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '7777777777', 'male', '1980-11-05'),
-('Claire Bennet', 'claire@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '8888888888', 'female', '1995-06-12'),
-('Tom Hardy', 'tom@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '9999999999', 'male', '1992-04-18'),
+('Admin User', 'admin@helixacare.com', '$2b$10$Nm6Kfq7exRO4pdpznoK6lOYakzHUg6qWJXaAhv9xmgD77Do//4ksO', 'admin', '1111111111', 'other', '1980-01-01'),
+('Dr. Strange', 'strange@helixacare.com', '$2b$10$j8aygi5zKmczoRel7aMf7.d65DTI1KdVinoWnpMr4RiwRdWcURoPm', 'doctor', '2222222222', 'male', '1975-05-10'),
+('Jane Patient', 'jane@helixacare.com', '$2b$10$wX7.A1/wNDjPFtN490wLVuM5OHYZsFMmWH9n6EasJTmF1/ETm5lDS', 'patient', '3333333333', 'female', '1990-09-20'),
+('Dr. Meredith Grey', 'meredith@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '5555555555', 'female', '1983-02-14'),
+('Mark Spencer', 'mark@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '6666666666', 'male', '1988-07-30'),
+('Dr. Karev Alex', 'karev@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '7777777777', 'male', '1980-11-05'),
+('Claire Bennet', 'claire@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '8888888888', 'female', '1995-06-12'),
+('Tom Hardy', 'tom@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '9999999999', 'male', '1992-04-18'),
 --Extra test users. Not added in 'patients' or 'doctors'
-('User 9', 'user9@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000009', 'male', '1989-10-10'),
-('User 10', 'user10@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000010', 'female', '1990-11-11'),
-('User 11', 'user11@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000011', 'other', '1991-12-12'),
-('User 12', 'user12@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000012', 'male', '1992-01-13'),
-('User 13', 'user13@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000013', 'female', '1993-02-14'),
-('User 14', 'user14@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000014', 'other', '1994-03-15'),
-('User 15', 'user15@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000015', 'male', '1995-04-16'),
-('User 16', 'user16@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000016', 'female', '1996-05-17'),
-('User 17', 'user17@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000017', 'other', '1997-06-18'),
-('User 18', 'user18@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000018', 'male', '1998-07-19'),
-('User 19', 'user19@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000019', 'female', '1999-08-20'),
-('User 20', 'user20@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000020', 'other', '2000-09-21'),
-('User 21', 'user21@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000021', 'male', '2001-10-22'),
-('User 22', 'user22@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000022', 'female', '2002-11-23'),
-('User 23', 'user23@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000023', 'other', '2003-12-24'),
-('User 24', 'user24@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000024', 'male', '2004-01-25'),
-('User 25', 'user25@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000025', 'female', '1980-02-26'),
-('User 26', 'user26@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000026', 'other', '1981-03-27'),
-('User 27', 'user27@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000027', 'male', '1982-04-28'),
-('User 28', 'user28@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000028', 'female', '1983-05-01'),
-('User 29', 'user29@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000029', 'other', '1984-06-02'),
-('User 30', 'user30@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000030', 'male', '1985-07-03'),
-('User 31', 'user31@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000031', 'female', '1986-08-04'),
-('User 32', 'user32@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000032', 'other', '1987-09-05'),
-('User 33', 'user33@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000033', 'male', '1988-10-06'),
-('User 34', 'user34@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000034', 'female', '1989-11-07'),
-('User 35', 'user35@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000035', 'other', '1990-12-08'),
-('User 36', 'user36@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000036', 'male', '1991-01-09'),
-('User 37', 'user37@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000037', 'female', '1992-02-10'),
-('User 38', 'user38@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000038', 'other', '1993-03-11'),
-('User 39', 'user39@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000039', 'male', '1994-04-12'),
-('User 40', 'user40@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000040', 'female', '1995-05-13'),
-('User 41', 'user41@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000041', 'other', '1996-06-14'),
-('User 42', 'user42@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000042', 'male', '1997-07-15'),
-('User 43', 'user43@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000043', 'female', '1998-08-16'),
-('User 44', 'user44@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000044', 'other', '1999-09-17'),
-('User 45', 'user45@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000045', 'male', '2000-10-18'),
-('User 46', 'user46@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000046', 'female', '2001-11-19'),
-('User 47', 'user47@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000047', 'other', '2002-12-20'),
-('User 48', 'user48@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000048', 'male', '2003-01-21'),
-('User 49', 'user49@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000049', 'female', '2004-02-22'),
-('User 50', 'user50@virtualhospitalplatform.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000050', 'other', '1980-03-23');
+('User 9', 'user9@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000009', 'male', '1989-10-10'),
+('User 10', 'user10@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000010', 'female', '1990-11-11'),
+('User 11', 'user11@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000011', 'other', '1991-12-12'),
+('User 12', 'user12@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000012', 'male', '1992-01-13'),
+('User 13', 'user13@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000013', 'female', '1993-02-14'),
+('User 14', 'user14@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000014', 'other', '1994-03-15'),
+('User 15', 'user15@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000015', 'male', '1995-04-16'),
+('User 16', 'user16@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000016', 'female', '1996-05-17'),
+('User 17', 'user17@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000017', 'other', '1997-06-18'),
+('User 18', 'user18@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000018', 'male', '1998-07-19'),
+('User 19', 'user19@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000019', 'female', '1999-08-20'),
+('User 20', 'user20@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000020', 'other', '2000-09-21'),
+('User 21', 'user21@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000021', 'male', '2001-10-22'),
+('User 22', 'user22@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000022', 'female', '2002-11-23'),
+('User 23', 'user23@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000023', 'other', '2003-12-24'),
+('User 24', 'user24@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000024', 'male', '2004-01-25'),
+('User 25', 'user25@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000025', 'female', '1980-02-26'),
+('User 26', 'user26@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000026', 'other', '1981-03-27'),
+('User 27', 'user27@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000027', 'male', '1982-04-28'),
+('User 28', 'user28@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000028', 'female', '1983-05-01'),
+('User 29', 'user29@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000029', 'other', '1984-06-02'),
+('User 30', 'user30@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000030', 'male', '1985-07-03'),
+('User 31', 'user31@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000031', 'female', '1986-08-04'),
+('User 32', 'user32@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000032', 'other', '1987-09-05'),
+('User 33', 'user33@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000033', 'male', '1988-10-06'),
+('User 34', 'user34@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000034', 'female', '1989-11-07'),
+('User 35', 'user35@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000035', 'other', '1990-12-08'),
+('User 36', 'user36@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000036', 'male', '1991-01-09'),
+('User 37', 'user37@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000037', 'female', '1992-02-10'),
+('User 38', 'user38@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000038', 'other', '1993-03-11'),
+('User 39', 'user39@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000039', 'male', '1994-04-12'),
+('User 40', 'user40@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000040', 'female', '1995-05-13'),
+('User 41', 'user41@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000041', 'other', '1996-06-14'),
+('User 42', 'user42@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000042', 'male', '1997-07-15'),
+('User 43', 'user43@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000043', 'female', '1998-08-16'),
+('User 44', 'user44@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000044', 'other', '1999-09-17'),
+('User 45', 'user45@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000045', 'male', '2000-10-18'),
+('User 46', 'user46@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000046', 'female', '2001-11-19'),
+('User 47', 'user47@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000047', 'other', '2002-12-20'),
+('User 48', 'user48@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'patient', '1000000048', 'male', '2003-01-21'),
+('User 49', 'user49@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'doctor', '1000000049', 'female', '2004-02-22'),
+('User 50', 'user50@helixacare.com', '$2b$10$qoLbs5n1ATk1iIKlhy.8m.b/xiw93/zU/E8pKJp3oSy94IxkwsDdC', 'admin', '1000000050', 'other', '1980-03-23');
 
 -- DOCTORS TABLE
 CREATE TABLE doctors (
@@ -132,21 +142,16 @@ INSERT INTO billing_addresses (user_id, addr_type, first_name, last_name, line1,
 (1, 'shipping', 'John',  'Doe',  '1234 Main St', 'Apt 2', 'Los Angeles', 'California', '90001', 'US', 'john.doe@example.com', '+1-213-555-0100', TRUE),
 (2, 'billing',  'Mary',  'Smith','55 King Rd',   NULL, 'Toronto', 'Ontario', 'M5V2T6', 'CA', 'mary@example.ca', '+1-416-555-0123', TRUE);
 
--- PAYMENT METHODS TABLE 
+-- PAYMENT METHODS TABLE
 CREATE TABLE payment_methods (
   	id               SERIAL PRIMARY KEY,
   	user_id          INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  	provider         VARCHAR(20) NOT NULL CHECK (provider IN ('paypal','card','cod')),
-  	-- Card (metadata only; NO PAN/CVC stored)
+  	provider         VARCHAR(20) NOT NULL CHECK (provider IN ('card','fpx')),
   	cardholder_name  VARCHAR(120),
-  	brand            VARCHAR(20),      -- e.g. 'visa', 'mastercard'
+  	brand            VARCHAR(20),
   	last4            CHAR(4),
-  	exp_month        SMALLINT,         -- 1..12 (nullable if not card)
-  	exp_year         SMALLINT,         -- yyyy
-  	-- PayPal (non-sensitive identifiers)
-  	paypal_payer_id  VARCHAR(64),
-  	paypal_email     VARCHAR(120),
-  	-- Status & flags
+  	exp_month        SMALLINT,
+  	exp_year         SMALLINT,
   	status           VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active','inactive')),
   	is_default       BOOLEAN DEFAULT FALSE,
   	created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -154,17 +159,8 @@ CREATE TABLE payment_methods (
 );
 
 -- Demo data
-INSERT INTO payment_methods
-  (user_id, provider, cardholder_name, brand, last4, exp_month, exp_year, status, is_default)
-VALUES
-  (1, 'card',   'John Doe', 'visa', '1111', 12, 2027, 'active', TRUE),
-  (1, 'paypal', NULL,       NULL,   NULL,   NULL, NULL, 'active', FALSE);
-
-INSERT INTO payment_methods
-  (user_id, provider, status, is_default)
-VALUES
-  (2, 'cod', 'active', TRUE);
-
+INSERT INTO payment_methods (user_id, provider, cardholder_name, brand, last4, exp_month, exp_year, status, is_default)
+VALUES (1, 'card', 'John Doe', 'visa', '1111', 12, 2027, 'active', TRUE);
 
 -------------------------------------------------------------------------------------------
 
@@ -188,7 +184,8 @@ INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_s
 (1, 3, '2025-05-10', '13:00', '13:30', 'pending', 'Specialist referral discussion'),
 (2, 1, '2025-05-11', '08:45', '09:15', 'confirmed', 'Lab results follow-up'),
 (4, 1, '2025-05-15', '10:30', '11:00', 'pending', 'Allergy assessment'),
-(3, 2, '2025-05-18', '09:00', '09:30', 'confirmed', 'Dietary advice and planning');
+(3, 2, '2025-05-18', '09:00', '09:30', 'confirmed', 'Dietary advice and planning'),
+(1, 1, '2025-05-20', '11:00', '11:30', 'completed', 'Completed appointment for integration tests');
 
 -- TIME SLOTS TABLE
 CREATE TABLE doctor_time_slots (
@@ -441,7 +438,8 @@ CREATE TABLE medications (
     name VARCHAR(100) UNIQUE NOT NULL,
 	type VARCHAR(20) CHECK (type IN ('countertop', 'prescription')),
     description TEXT,
-    price NUMERIC(10,2) NOT NULL
+    price NUMERIC(10,2) NOT NULL,
+    photo_url TEXT
 );
 
 -- SEEDED DATA
@@ -459,10 +457,15 @@ INSERT INTO medications (name, type, description, price) VALUES
 CREATE TABLE pharmacy_orders (
     id SERIAL PRIMARY KEY,
     patient_id INT REFERENCES patients(id),
+    prescription_id INT REFERENCES prescriptions(id) ON DELETE SET NULL,
     medications TEXT NOT NULL,
+    quantities TEXT,
     total_amount NUMERIC(10,2) NOT NULL,
-    status VARCHAR(20) DEFAULT 'pending',
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'dispatched', 'delivered', 'cancelled')),
     prescription_file TEXT,
+    delivery_address TEXT,
+    payment_method VARCHAR(50) DEFAULT 'cash',
+    insurance_request_id INT,
     ordered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -640,6 +643,22 @@ VALUES
 (2, 2, 'monthly', 'approved', 'https://storage.example.com/paperwork/claire_bennet.pdf', '2025-06-01', '2026-06-01', 'Approved by admin.'),
 (6, 3, 'monthly', 'rejected', 'https://storage.example.com/paperwork/tom_hardy.pdf', NULL, NULL, 'Certificate invalid. Please resubmit.');
 
+-- PAYMENT TRANSACTIONS TABLE
+CREATE TABLE payment_transactions (
+  id                    SERIAL PRIMARY KEY,
+  user_id               INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  bill_id               INT REFERENCES bills(id) ON DELETE SET NULL,
+  doctor_subscription_id INT REFERENCES doctor_subscriptions(id) ON DELETE SET NULL,
+  amount                NUMERIC(10,2) NOT NULL,
+  currency              CHAR(3) DEFAULT 'MYR',
+  method_type           VARCHAR(20) NOT NULL CHECK (method_type IN ('card','fpx')),
+  fpx_bank              VARCHAR(50),
+  payment_method_id     INT REFERENCES payment_methods(id) ON DELETE SET NULL,
+  transaction_ref       VARCHAR(100) NOT NULL UNIQUE,
+  status                VARCHAR(20) DEFAULT 'success' CHECK (status IN ('success','failed','pending')),
+  created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -------------------------------------------------------------------------------------------
 
 -- INSURANCE REQUESTS TABLE
@@ -656,12 +675,15 @@ CREATE TABLE insurance_requests (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-INSERT INTO insurance_requests 
+INSERT INTO insurance_requests
   (patient_id, doctor_id, bill_id, insurance_company, insurance_id_number, start_date, end_date, status)
 VALUES
   (1, 2, 1, 'Allianz Saudi Arabia', 'A123456789', '2025-06-01', '2026-06-01', 'pending'),
   (2, 3, 2, 'Bupa Arabia', 'B987654321', '2025-07-01', '2026-07-01', 'accepted'),
   (3, 2, 3, 'Medgulf', 'M555222888', '2025-05-01', '2026-05-01', 'rejected');
+
+-- Add FK from pharmacy_orders to insurance_requests (deferred because pharmacy_orders is created earlier)
+ALTER TABLE pharmacy_orders ADD CONSTRAINT fk_pharmacy_insurance FOREIGN KEY (insurance_request_id) REFERENCES insurance_requests(id) ON DELETE SET NULL;
 
 -------------------------------------------------------------------------------------------
 
@@ -762,6 +784,76 @@ INSERT INTO health_programs (name, description, start_date, end_date, eligibilit
 
 -------------------------------------------------------------------------------------------
 
+-------------------------------------------------------------------------------------------
+
+-- TRIAGE SYMPTOM RULES TABLE
+CREATE TABLE triage_symptom_rules (
+    id SERIAL PRIMARY KEY,
+    urgency_level VARCHAR(20) NOT NULL CHECK (urgency_level IN ('emergency', 'urgent', 'standard', 'self_care')),
+    keywords TEXT NOT NULL,
+    recommended_action TEXT NOT NULL,
+    recommended_department VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO triage_symptom_rules (urgency_level, keywords, recommended_action, recommended_department) VALUES
+('emergency', 'chest pain,difficulty breathing,heart attack,stroke,unconscious,severe bleeding,choking,anaphylaxis,cardiac arrest,stopped breathing', 'Call emergency services immediately. Do not wait.', 'Emergency'),
+('urgent', 'high fever,persistent headache,severe headache,difficulty swallowing,sudden confusion,dehydration,broken bone,deep cut,severe abdominal pain,coughing blood', 'Visit the nearest urgent care clinic or emergency department as soon as possible.', 'Urgent Care'),
+('standard', 'mild cough,sore throat,runny nose,ear pain,mild fever,diarrhea,vomiting,stomach ache,urinary pain,mild back pain', 'Schedule an appointment with your doctor within 24-48 hours.', 'General Practice'),
+('self_care', 'minor cut,mild skin rash,insect bite,minor bruise,slight cold,mild headache,mild fatigue,dry skin,slight nausea', 'Rest and treat at home. Monitor for worsening symptoms.', 'Self Care');
+
+-- TRIAGE SESSIONS TABLE
+CREATE TABLE triage_sessions (
+    id SERIAL PRIMARY KEY,
+    patient_id INT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    symptoms_text TEXT NOT NULL,
+    urgency_level VARCHAR(20) NOT NULL CHECK (urgency_level IN ('emergency', 'urgent', 'standard', 'self_care')),
+    recommended_action TEXT,
+    recommended_department VARCHAR(100),
+    follow_up_recommended BOOLEAN DEFAULT FALSE,
+    escalated_to_doctor_id INT REFERENCES doctors(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- FOLLOW-UP SCHEDULES TABLE
+CREATE TABLE follow_up_schedules (
+    id SERIAL PRIMARY KEY,
+    patient_id INT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    doctor_id INT REFERENCES doctors(id) ON DELETE SET NULL,
+    appointment_id INT REFERENCES appointments(id) ON DELETE SET NULL,
+    triage_session_id INT REFERENCES triage_sessions(id) ON DELETE SET NULL,
+    created_by INT REFERENCES users(id) ON DELETE SET NULL,
+    scheduled_date DATE NOT NULL,
+    notes TEXT,
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'cancelled', 'missed')),
+    reminder_sent BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO follow_up_schedules (patient_id, doctor_id, created_by, scheduled_date, notes, status, reminder_sent) VALUES
+(1, 1, 2, CURRENT_DATE + INTERVAL '3 days', 'Check blood pressure after medication change', 'pending', FALSE),
+(1, 1, 2, CURRENT_DATE - INTERVAL '2 days', 'Post-surgery review (overdue)', 'pending', FALSE),
+(1, NULL, NULL, CURRENT_DATE + INTERVAL '7 days', 'Auto follow-up from triage session', 'pending', FALSE);
+
+-- HEALTH LOGS TABLE
+CREATE TABLE health_logs (
+    id SERIAL PRIMARY KEY,
+    patient_id INT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    log_type VARCHAR(30) NOT NULL CHECK (log_type IN ('vitals', 'symptom_update', 'medication_adherence', 'general')),
+    data JSONB,
+    notes TEXT,
+    logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO health_logs (patient_id, log_type, data, notes) VALUES
+(1, 'vitals', '{"heart_rate": 72, "blood_pressure": "120/80", "temperature": 36.6, "weight_kg": 70}', 'Morning vitals'),
+(1, 'symptom_update', '{"symptoms": ["mild headache", "fatigue"], "severity": "mild"}', 'Felt tired after medication'),
+(1, 'medication_adherence', '{"medication": "Metformin 500mg", "taken": true, "time": "08:00"}', 'Taken with breakfast'),
+(1, 'general', NULL, 'Feeling better overall today');
+
+-------------------------------------------------------------------------------------------
+
 -- PASSWORDS TABLE (Development)
 CREATE TABLE user_passwords (
   email VARCHAR(100) PRIMARY KEY,
@@ -769,12 +861,12 @@ CREATE TABLE user_passwords (
 );
 
 INSERT INTO user_passwords (email, password) VALUES
-('admin@virtualhospitalplatform.com', 'admin123'),
-('strange@virtualhospitalplatform.com', 'doctor123'),
-('jane@virtualhospitalplatform.com', 'patient123'),
-('meredith@virtualhospitalplatform.com', 'password'),
-('mark@virtualhospitalplatform.com', 'password'),
-('karev@virtualhospitalplatform.com', 'password'),
-('claire@virtualhospitalplatform.com', 'password'),
-('tom@virtualhospitalplatform.com', 'password');
+('admin@helixacare.com', 'admin123'),
+('strange@helixacare.com', 'doctor123'),
+('jane@helixacare.com', 'patient123'),
+('meredith@helixacare.com', 'password'),
+('mark@helixacare.com', 'password'),
+('karev@helixacare.com', 'password'),
+('claire@helixacare.com', 'password'),
+('tom@helixacare.com', 'password');
 

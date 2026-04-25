@@ -63,7 +63,7 @@ if (process.env.NODE_ENV === 'production') {
 // Define CORS options
 const allowedOrigins = Array.from(new Set([
   'http://localhost:3000',
-  process.env.FRONTEND_ORIGIN || 'https://virtual-hospital-platform.vercel.app/'
+  process.env.FRONTEND_ORIGIN || 'https://helixacare.vercel.app'
 ]));
 
 const corsOptions = {
@@ -167,6 +167,12 @@ app.use('/api/patients', require('./routes/patient/patient'));
 app.use('/api/insurance-requests', require('./routes/insurance/insuranceRequests'))
 
 app.use('/api/support-tickets', require('./routes/supportTickets/supportTickets'));
+
+app.use('/api/triage', require('./routes/triage/triage'));
+
+app.use('/api/follow-ups', require('./routes/followUp/followUps'));
+app.use('/api/health-logs', require('./routes/healthLogs/healthLogs'));
+app.use('/api/consultation-history', require('./routes/consultationHistory/consultationHistory'));
 
 // Frontend entry
 app.get('/', (req, res) => {

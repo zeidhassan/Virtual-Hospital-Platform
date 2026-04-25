@@ -146,3 +146,49 @@ exports.reassignAppointment = async (req, res) => {
     res.status(500).json({ error: 'Failed to reassign appointment.' });
   }
 };
+
+exports.updateAppointment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, appointment_date, appointment_start_time, appointment_end_time } = req.body;
+
+    const updates = [];
+    const values = [];
+
+    if (status) {
+      values.push(status);
+      updates.push(`status = $${values.length}`);
+    }
+    if (appointment_date) {
+      values.push(appointment_date);
+      updates.push(`appointment_date = $${values.length}`);
+    }
+    if (appointment_start_time) {
+      values.push(appointment_start_time);
+      updates.push(`appointment_start_time = $${values.length}`);
+    }
+    if (appointment_end_time) {
+      values.push(appointment_end_time);
+      updates.push(`appointment_end_time = $${values.length}`);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No fields to update.' });
+    }
+
+    values.push(id);
+    const result = await pool.query(
+      `UPDATE appointments SET ${updates.join(', ')} WHERE id = $${values.length} RETURNING *`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Appointment not found.' });
+    }
+
+    res.json({ message: 'Appointment updated successfully.', appointment: result.rows[0] });
+  } catch (err) {
+    console.error('[updateAppointment]', err.message);
+    res.status(500).json({ error: 'Failed to update appointment.' });
+  }
+};

@@ -56,6 +56,11 @@ exports.submitAnswer = async (req, res) => {
   }
 
   const { patient_id, question_id, answer } = req.body;
+
+  if (!patient_id || !question_id || !answer) {
+    return res.status(400).json({ error: 'patient_id, question_id, and answer are required.' });
+  }
+
   try {
     await db.query(
       `INSERT INTO patient_question_responses (patient_id, question_id, answer) 
@@ -276,11 +281,11 @@ exports.getResponsesForLoggedInPatient = async (req, res) => {
     }
 
     const responses = await db.query(
-      `SELECT r.id AS response_id, 
-              q.question_text, 
-              r.answer, 
+      `SELECT r.id AS response_id,
+              q.question_text,
+              r.answer,
               r.created_at,
-              n.note, 
+              n.note,
               n.created_at AS note_created_at
        FROM patient_question_responses r
        JOIN question_bank q ON r.question_id = q.id
@@ -294,5 +299,35 @@ exports.getResponsesForLoggedInPatient = async (req, res) => {
   } catch (err) {
     console.error('[getResponsesForLoggedInPatient] Error:', err.stack || err);
     return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Doctor: get all question responses from their linked patients
+exports.getDoctorPatientResponses = async (req, res) => {
+  try {
+    const doctorResult = await db.query('SELECT id FROM doctors WHERE user_id = $1', [req.user.id]);
+    if (doctorResult.rowCount === 0) return res.status(404).json({ error: 'Doctor not found.' });
+    const doctorId = doctorResult.rows[0].id;
+
+    const responses = await db.query(
+      `SELECT
+         r.id, r.patient_id, r.question_id, r.answer, r.created_at,
+         u.full_name AS patient_name,
+         q.question_text
+       FROM patient_question_responses r
+       JOIN patients p ON r.patient_id = p.id
+       JOIN users u ON p.user_id = u.id
+       JOIN question_bank q ON r.question_id = q.id
+       WHERE p.id IN (
+         SELECT DISTINCT patient_id FROM appointments WHERE doctor_id = $1
+       )
+       ORDER BY r.created_at DESC`,
+      [doctorId]
+    );
+
+    res.json(responses.rows);
+  } catch (err) {
+    console.error('[getDoctorPatientResponses]', err);
+    res.status(500).json({ error: 'Server error.' });
   }
 };

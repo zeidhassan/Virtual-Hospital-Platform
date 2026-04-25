@@ -6,7 +6,7 @@ describe('Auth Integration Tests', () => {
 
   it('should login with seeded patient account', async () => {
     const res = await request(app).post('/api/auth/login').send({
-      email: 'jane@virtualhospitalplatform.com',
+      email: 'jane@helixacare.com',
       password: 'patient123'
     });
     expect(res.statusCode).toBe(200);
@@ -20,7 +20,7 @@ describe('Auth Integration Tests', () => {
       .set('Authorization', `Bearer ${token}`);
       
     expect(res.statusCode).toBe(200);
-    expect(res.body).toHaveProperty('email', 'jane@virtualhospitalplatform.com');
+    expect(res.body).toHaveProperty('email', 'jane@helixacare.com');
     expect(res.body).toHaveProperty('role', 'patient');
   });
 });

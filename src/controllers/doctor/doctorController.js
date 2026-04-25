@@ -250,7 +250,7 @@ exports.getMedicalRecords = async (req, res) => {
 // Update a medical record by doctor
 exports.updateMedicalRecord = async (req, res) => {
   const { id } = req.params;
-  const { records_type, description, private } = req.body;
+  const { records_type, description, private: isPrivate } = req.body;
   try {
     const userId = req.user.id;
 
@@ -273,7 +273,7 @@ exports.updateMedicalRecord = async (req, res) => {
        SET record_type = $1, description = $2, create_at = NOW(), private =$3
        WHERE id = $4 AND doctor_id = $5
        RETURNING *`,
-      [records_type, encryptedDescription, private, id, doctorId]
+      [records_type, encryptedDescription, isPrivate, id, doctorId]
     );
 
     if (result.rows.length === 0) {

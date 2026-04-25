@@ -1,4 +1,5 @@
 const pool = require('../../config/db'); // PostgreSQL connection pool
+const handleDbError = require('../../utils/handleDbError');
 const paginate = require('../../utils/pagination'); // Pagination utility
 
 // GET all medical records (admin only)
@@ -57,7 +58,7 @@ exports.getMedicalRecordById = async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -67,18 +68,18 @@ exports.createMedicalRecord = async (req, res) => {
     return res.status(403).json({ error: 'Only admins can create medical records.' });
   }
 
-  const { patient_id, doctor_id, appointment_id, record_type, description, file_url, private } = req.body;
+  const { patient_id, doctor_id, appointment_id, record_type, description, file_url, private: isPrivate } = req.body;
 
   try {
     const result = await pool.query(
       `INSERT INTO medical_records (patient_id, doctor_id, appointment_id, record_type, description, file_url, created_at, private)
        VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7) RETURNING *`,
-      [patient_id, doctor_id, appointment_id, record_type, description, file_url, private]
+      [patient_id, doctor_id, appointment_id, record_type, description, file_url, isPrivate]
     );
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -104,7 +105,7 @@ exports.updateMedicalRecord = async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -123,6 +124,6 @@ exports.deleteMedicalRecord = async (req, res) => {
 
     res.json({ message: 'Medical record deleted successfully' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };

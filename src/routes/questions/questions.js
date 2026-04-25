@@ -344,5 +344,19 @@ router.get('/my-responses',
 );
 
 
+/**
+ * @swagger
+ * /api/questions/doctor-responses:
+ *   get:
+ *     summary: Doctor gets all question responses from their linked patients
+ *     tags: [Questions]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of patient responses
+ */
+router.get('/doctor-responses', verifyToken, questionsController.getDoctorPatientResponses);
+
 // Export the configured router
 module.exports = router;

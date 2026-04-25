@@ -1,6 +1,7 @@
 jest.mock('pg', () => {
   const mockConnect = jest.fn();
-  const mockPool = jest.fn(() => ({ connect: mockConnect }));
+  const mockOn = jest.fn();
+  const mockPool = jest.fn(() => ({ connect: mockConnect, on: mockOn }));
   return { Pool: mockPool };
 });
 
@@ -36,21 +37,28 @@ describe('DB Config', () => {
   });
 
   test('should create pg Pool instance with correct config', () => {
+    delete process.env.DATABASE_URL;
+    delete process.env.DB_URL;
+    process.env.DB_MODE = 'local';
     process.env.DB_USER = 'user';
     process.env.DB_HOST = 'localhost';
     process.env.DB_DATABASE = 'testdb';
     process.env.DB_PASSWORD = 'pass';
     process.env.DB_PORT = '5432';
 
+    // Prevent dotenv from reloading .env.test (which would restore DATABASE_URL)
+    const dotenv = require('dotenv');
+    jest.spyOn(dotenv, 'config').mockReturnValue({});
+
     const { Pool } = require('pg');
     require('../../src/config/db');
 
-    expect(Pool).toHaveBeenCalledWith({
+    expect(Pool).toHaveBeenCalledWith(expect.objectContaining({
       user: 'user',
       host: 'localhost',
       database: 'testdb',
       password: 'pass',
-      port: '5432',
-    });
+      port: 5432,
+    }));
   });
 });

@@ -7,7 +7,7 @@ describe('Appointments Integration Tests', () => {
   beforeAll(async () => {
     // Login as an admin (make sure this user exists in test DB and has role 'admin')
     const res = await request(app).post('/api/auth/login').send({
-      email: 'admin@virtualhospitalplatform.com',
+      email: 'admin@helixacare.com',
       password: 'admin123'
     });
     token = res.body.token;
@@ -15,7 +15,7 @@ describe('Appointments Integration Tests', () => {
 
   it('should create a new appointment', async () => {
     const res = await request(app)
-      .post('/api/appointments')
+      .post('/api/adminBoard/appointments')
       .set('Authorization', `Bearer ${token}`)
       .send({
         patient_id: 1,

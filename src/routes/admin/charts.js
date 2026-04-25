@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const chartsController = require('../../controllers/admin/chartsController');
 const requireRole = require('../../middleware/requireRole');
+const verifyToken = require('../../middleware/verifyToken');
+
+router.use(verifyToken);
 
 // All routes require admin or doctor access
 const allowedRoles = ['admin', 'doctor'];

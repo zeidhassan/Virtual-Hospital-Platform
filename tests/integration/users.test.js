@@ -4,7 +4,7 @@ const pool = require('../../src/config/db');
 
 describe('User Management API Tests (Basic User Table Only)', () => {
   let token;
-  const testEmail = `testuser${Date.now()}@virtualhospitalplatform.com`;
+  const testEmail = `testuser${Date.now()}@helixacare.com`;
 
   it('should register a new patient', async () => {
     const res = await request(app)

@@ -7,13 +7,13 @@ describe('Medical Records API Tests', () => {
 
   beforeAll(async () => {
     const doctorLogin = await request(app).post('/api/auth/login').send({
-      email: 'strange@virtualhospitalplatform.com',
+      email: 'strange@helixacare.com',
       password: 'doctor123'
     });
     doctorToken = doctorLogin.body.token;
 
     const patientLogin = await request(app).post('/api/auth/login').send({
-      email: 'jane@virtualhospitalplatform.com',
+      email: 'jane@helixacare.com',
       password: 'patient123'
     });
     patientToken = patientLogin.body.token;
@@ -21,10 +21,10 @@ describe('Medical Records API Tests', () => {
 
   it('should allow doctor to upload a medical record', async () => {
     const res = await request(app)
-      .post('/api/upload/medical-record')
+      .post('/api/medical-records')
       .set('Authorization', `Bearer ${doctorToken}`)
-      .field('patient_id', 1)
-      .field('record_type', 'X-ray')
+      .field('appointment_id', 9)
+      .field('record_type', 'xray')
       .field('description', 'Test upload via integration test')
       .attach('file', path.join(__dirname, '../__mocks__/testfile.pdf'));
 

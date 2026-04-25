@@ -1,5 +1,11 @@
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
+
+// Ensure upload directories exist at startup
+['medical-records', 'prescriptions', 'support-tickets'].forEach((dir) => {
+  fs.mkdirSync(path.join(__dirname, `../../uploads/${dir}`), { recursive: true });
+});
 
 // Allowed MIME types
 const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];

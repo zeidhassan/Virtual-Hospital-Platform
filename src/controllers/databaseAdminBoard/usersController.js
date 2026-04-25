@@ -1,4 +1,5 @@
 const pool = require('../../config/db'); // PostgreSQL connection pool
+const handleDbError = require('../../utils/handleDbError');
 const paginate = require('../../utils/pagination'); // Pagination utility
 const bcrypt = require('bcryptjs');
 
@@ -59,7 +60,7 @@ exports.getUserById = async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -71,6 +72,10 @@ exports.createUser = async (req, res) => {
     }
 
     const { full_name, email, password, role, phone, gender, date_of_birth } = req.body;
+
+    if (!full_name || !email || !password || !role) {
+      return res.status(400).json({ error: 'Missing required fields: full_name, email, password, role' });
+    }
 
     // Hash the plain password
     const password_hash = await bcrypt.hash(password, 10);
@@ -90,7 +95,7 @@ exports.createUser = async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -133,7 +138,7 @@ exports.updateUser = async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -151,7 +156,7 @@ exports.deleteUser = async (req, res) => {
 
     res.json({ message: 'User deleted successfully' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };
 
@@ -214,6 +219,6 @@ exports.updateOwnProfile = async (req, res) => {
 
   } catch (err) {
     console.error('[ERROR] Update profile failed:', err.message);
-    res.status(500).json({ error: err.message });
+    return handleDbError(err, res);
   }
 };

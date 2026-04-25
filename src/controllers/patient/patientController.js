@@ -135,7 +135,12 @@ exports.getPrescriptions = async (req, res) => {
       `
     });
 
-    res.json(result);
+    const prescriptions = (result.data || []).map(p => ({
+      ...p,
+      instructions: decrypt(p.instructions),
+    }));
+
+    res.json({ ...result, data: prescriptions });
   } catch (err) {
     console.error('[ERROR] getPrescriptions:', err);
     res.status(500).json({ message: 'Failed to fetch prescriptions' });
@@ -245,7 +250,7 @@ exports.getMedicalRecords = async (req, res) => {
       sortTable: 'mr',
       filters: {
         'mr.patient_id': patientId,
-        'mr.private': false,
+        'mr.private': 'false',   // string 'false' → paginate boolean handler
         ...filters
       },
       select: `
@@ -254,12 +259,12 @@ exports.getMedicalRecords = async (req, res) => {
       `
     });
 
-    const records = result.rows.map(r => ({
-      ...r,
-      description: decrypt(r.description)
-    }));
+    const records = (result.data || [])
+      .filter(r => r.record_type !== 'prescription')
+      .map(r => ({ ...r, description: decrypt(r.description) }));
 
-    res.json(records);
+    // Return paginated wrapper (same shape as getPrescriptions)
+    res.json({ ...result, data: records });
   } catch (err) {
     console.error("[ERROR] Failed to fetch medical records:", err.stack);
     res.status(500).json({ message: "Internal server error" });

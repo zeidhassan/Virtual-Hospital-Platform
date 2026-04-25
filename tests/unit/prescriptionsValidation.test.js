@@ -32,7 +32,8 @@ describe('Prescription Validation', () => {
         dosage: '500mg',
         instructions: 'Take after meals',
         issued_date: '2025-12-31'
-      }
+      },
+      params: { appointmentId: '123' }
     };
     const res = {};
     const next = jest.fn();

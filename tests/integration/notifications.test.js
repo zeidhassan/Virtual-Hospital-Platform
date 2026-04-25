@@ -15,30 +15,30 @@ jest.mock('../../src/middleware/requireRole', () => () => (req, res, next) => ne
 describe('Notifications API (Admin)', () => {
   afterEach(() => jest.clearAllMocks());
 
-  test('GET /api/notifications - should return all notifications', async () => {
-    pool.query.mockResolvedValueOnce({
-      rows: [
+  test('GET /api/adminBoard/notifications - should return all notifications', async () => {
+    // paginate() makes two queries: data then count
+    pool.query
+      .mockResolvedValueOnce({ rows: [
         { id: 1, message: 'Test 1' },
         { id: 2, message: 'Test 2' }
-      ]
-    });
+      ]})
+      .mockResolvedValueOnce({ rows: [{ total: '2' }] });
 
     const res = await request(app)
-      .get('/api/notifications')
+      .get('/api/adminBoard/notifications')
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.statusCode).toBe(200);
-    expect(res.body.length).toBe(2);
-    expect(pool.query).toHaveBeenCalledWith('SELECT * FROM notifications ORDER BY id');
+    expect(res.body.data.length).toBe(2);
   });
 
-  test('GET /api/notifications/:id - found', async () => {
+  test('GET /api/adminBoard/notifications/:id - found', async () => {
     pool.query.mockResolvedValueOnce({
       rows: [{ id: 1, message: 'Welcome' }]
     });
 
     const res = await request(app)
-      .get('/api/notifications/1')
+      .get('/api/adminBoard/notifications/1')
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.statusCode).toBe(200);
@@ -46,11 +46,11 @@ describe('Notifications API (Admin)', () => {
     expect(pool.query).toHaveBeenCalledWith('SELECT * FROM notifications WHERE id = $1', ['1']);
   });
 
-  test('GET /api/notifications/:id - not found', async () => {
+  test('GET /api/adminBoard/notifications/:id - not found', async () => {
     pool.query.mockResolvedValueOnce({ rows: [] });
 
     const res = await request(app)
-      .get('/api/notifications/999')
+      .get('/api/adminBoard/notifications/999')
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.statusCode).toBe(404);

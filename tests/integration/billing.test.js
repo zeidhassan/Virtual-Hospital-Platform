@@ -7,19 +7,19 @@ describe('Billing API Tests', () => {
 
   beforeAll(async () => {
     const loginAdmin = await request(app).post('/api/auth/login').send({
-      email: 'admin@virtualhospitalplatform.com',
+      email: 'admin@helixacare.com',
       password: 'admin123'
     });
     adminToken = loginAdmin.body.token;
 
     const loginDoctor = await request(app).post('/api/auth/login').send({
-      email: 'strange@virtualhospitalplatform.com',
+      email: 'strange@helixacare.com',
       password: 'doctor123'
     });
     doctorToken = loginDoctor.body.token;
 
     const loginPatient = await request(app).post('/api/auth/login').send({
-      email: 'jane@virtualhospitalplatform.com',
+      email: 'jane@helixacare.com',
       password: 'patient123'
     });
     patientToken = loginPatient.body.token;

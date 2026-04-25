@@ -52,8 +52,8 @@ exports.acceptInsuranceRequest = async (req, res) => {
 
     // Notify patient
     await db.query(`
-      INSERT INTO notifications (user_id, title, message, created_at)
-      VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+      INSERT INTO notifications (user_id, title, body)
+      VALUES ($1, $2, $3)
     `, [patient_id, 'Insurance Approved', `Your insurance request for Bill #${bill_id} has been approved and your bill is now marked paid.`]);
 
     res.status(200).json({ message: 'Insurance request approved and bill paid.' });
@@ -86,14 +86,56 @@ exports.rejectInsuranceRequest = async (req, res) => {
 
     // Notify patient
     await db.query(`
-      INSERT INTO notifications (user_id, title, message, created_at)
-      VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+      INSERT INTO notifications (user_id, title, body)
+      VALUES ($1, $2, $3)
     `, [patient_id, 'Insurance Rejected', rejection_message || `Your insurance request for Bill #${bill_id} was rejected.`]);
 
     res.status(200).json({ message: 'Insurance request rejected and patient notified.' });
 
   } catch (err) {
     console.error('Error rejecting insurance request:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Patient: View own insurance requests (by token)
+exports.getMyInsuranceRequests = async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const result = await db.query(`
+      SELECT ir.*,
+        COALESCE(u.full_name, 'N/A') AS doctor_name
+      FROM insurance_requests ir
+      LEFT JOIN users u ON ir.doctor_id = u.id
+      WHERE ir.patient_id = $1
+      ORDER BY ir.created_at DESC
+    `, [userId]);
+    res.status(200).json(result.rows);
+  } catch (err) {
+    console.error('Error fetching my insurance requests:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Patient: Submit a new insurance request
+exports.submitInsuranceRequest = async (req, res) => {
+  const userId = req.user.id;
+  const { doctor_id, bill_id, insurance_company, insurance_id_number, start_date, end_date } = req.body;
+
+  if (!insurance_company || !insurance_id_number || !start_date || !end_date) {
+    return res.status(400).json({ error: 'insurance_company, insurance_id_number, start_date, and end_date are required.' });
+  }
+
+  try {
+    const result = await db.query(`
+      INSERT INTO insurance_requests (patient_id, doctor_id, bill_id, insurance_company, insurance_id_number, start_date, end_date)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING *
+    `, [userId, doctor_id || null, bill_id || null, insurance_company, insurance_id_number, start_date, end_date]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('Error submitting insurance request:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -143,6 +185,28 @@ exports.getAllInsuranceRequests = async (req, res) => {
     res.status(200).json(result.rows);
   } catch (err) {
     console.error('Error fetching all insurance requests:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Patient: Check for active (accepted) insurance coverage
+exports.getActiveInsurance = async (req, res) => {
+  const userId = req.user.id;
+  try {
+    // insurance_requests.patient_id references users.id directly (not patients.id)
+    const result = await db.query(`
+      SELECT ir.* FROM insurance_requests ir
+      WHERE ir.patient_id = $1 AND ir.status = 'accepted'
+      ORDER BY ir.created_at DESC
+      LIMIT 1
+    `, [userId]);
+
+    if (result.rows.length === 0) {
+      return res.json({ hasInsurance: false, insurance: null });
+    }
+    res.json({ hasInsurance: true, insurance: result.rows[0] });
+  } catch (err) {
+    console.error('Error checking active insurance:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
