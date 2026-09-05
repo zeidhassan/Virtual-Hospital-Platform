@@ -6,7 +6,7 @@ exports.getUserProfile = async (req, res) => {
 
   try {
     // Get basic user info
-    const userResult = await pool.query('SELECT id, full_name, email, role, phone, gender, date_of_birth FROM users WHERE id = $1', [userId]);
+    const userResult = await pool.query('SELECT id, full_name, email, role, phone, gender, date_of_birth, profile_picture_url FROM users WHERE id = $1', [userId]);
     if (userResult.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }

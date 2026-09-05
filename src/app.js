@@ -13,6 +13,11 @@ require('./controllers/authentication/facebookStrategy');
 
 const app = express();
 
+// Behind a reverse proxy (Render/NGINX/etc.), req.ip is otherwise the proxy's
+// address for every request — which would make the rate limiters below key
+// on one IP for all traffic. '1' trusts exactly one hop in front of us.
+app.set('trust proxy', 1);
+
 // Security Middleware
 if (process.env.NODE_ENV === 'production') {
   app.use(helmet());
@@ -66,8 +71,17 @@ const allowedOrigins = Array.from(new Set([
   process.env.FRONTEND_ORIGIN || 'https://helixacare.vercel.app'
 ]));
 
+// ngrok free-tier URLs rotate every session, so they can't be listed by exact
+// value — match any subdomain of the tunnel domains instead.
+const ngrokOriginPattern = /^https:\/\/[a-z0-9-]+\.(ngrok-free\.app|ngrok\.io|ngrok\.app)$/;
+
 const corsOptions = {
-  origin: allowedOrigins, // allowed origins
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin) || ngrokOriginPattern.test(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], // allowed HTTP methods
   credentials: true // allow cookies or credentials if needed
 };
@@ -75,21 +89,19 @@ const corsOptions = {
 // Apply CORS middleware with options
 app.use(cors(corsOptions));
 
-// Debugging
-app.use((err, req, res, next) => {
-  console.error('[UNHANDLED ERROR]', err);
-  res.status(500).json({ message: 'Unexpected error', error: err.message });
-});
-
 app.use(passport.initialize());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use(express.urlencoded({ extended: true }));
 
 // Swagger
 const swaggerSpec = require('./config/swagger');  // make sure path is correct
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// General traffic ceiling across the whole API — the stricter per-route
+// limiters (login, register, triage) still apply on top of this.
+const { generalApiLimiter } = require('./middleware/rateLimit');
+app.use('/api', generalApiLimiter);
 
 // Routes
 app.use('/api/adminBoard/users', require('./routes/databaseAdminBoard/users'));
@@ -117,9 +129,16 @@ app.use('/api/adminBoard/support-tickets', require('./routes/databaseAdminBoard/
 app.use('/api/adminBoard/support-ticket-replies', require('./routes/databaseAdminBoard/supportTicketReplies')); // NEW 
 app.use('/api/adminBoard/services', require('./routes/databaseAdminBoard/services'));
 app.use('/api/adminBoard/health-programs', require('./routes/databaseAdminBoard/healthPrograms.js')); // MODIFIED API NAME (programs -> health-programs)
-
-app.use('/api/payments/paypal', require('./routes/payments/paypal'));
-
+app.use('/api/adminBoard/health-logs', require('./routes/databaseAdminBoard/healthLogs'));
+app.use('/api/adminBoard/patient-insurance', require('./routes/databaseAdminBoard/patientInsurance'));
+app.use('/api/adminBoard/payment-methods', require('./routes/databaseAdminBoard/paymentMethods'));
+app.use('/api/adminBoard/payment-transactions', require('./routes/databaseAdminBoard/paymentTransactions'));
+app.use('/api/adminBoard/billing-addresses', require('./routes/databaseAdminBoard/billingAddresses'));
+app.use('/api/adminBoard/conversations', require('./routes/databaseAdminBoard/conversations'));
+app.use('/api/adminBoard/conversation-participants', require('./routes/databaseAdminBoard/conversationParticipants'));
+app.use('/api/adminBoard/question-assignments', require('./routes/databaseAdminBoard/questionAssignments'));
+app.use('/api/adminBoard/triage-sessions', require('./routes/databaseAdminBoard/triageSessions'));
+app.use('/api/adminBoard/triage-symptom-rules', require('./routes/databaseAdminBoard/triageSymptomRules'));
 
 app.use('/api/auth', require('./routes/authentication/auth'));
 app.use('/api/auth/profile', require('./routes/authentication/profile'));
@@ -145,11 +164,16 @@ app.use('/api/doctor/time-slots', require('./routes/doctor/doctorTimeSlots'));
 app.use('/api/patient', require('./routes/patient/patient'));
 app.use('/api/patient/appointments', require('./routes/patient/patientAppointments'));
 
-// File Uploads? 
-app.use('/uploads', express.static('uploads'));
+// Profile pictures are the one upload type that's genuinely public — shown
+// across roles (a patient sees their doctor's avatar, etc.) so they stay on
+// a narrow static mount. Every other upload type (medical records,
+// prescriptions, support-ticket attachments) is served only through the
+// authenticated, ownership-checked routes in /api/files.
+app.use('/uploads/profile-pictures', express.static(path.join(__dirname, '../uploads/profile-pictures')));
 
+// Medical record uploads/listing live under /api/doctor and /api/patient —
+// this module only keeps the record-delete endpoint (see the route file).
 app.use('/api/medical-records', require('./routes/medicalRecords/medicalRecords'));
-app.use('/api/prescriptions', require('./routes/prescriptions/prescriptions'));
 app.use('/api/files', require('./routes/files/files'));
 
 app.use('/api/pharmacy-orders', require('./routes/PharmacyOrders/pharmacyOrders'));
@@ -157,12 +181,10 @@ app.use('/api/medications', require('./routes/medications/medications'));
 
 app.use('/api/payments', require('./routes/payments/payments'));
 app.use('/api/payments/bills', require('./routes/payments/bills'));
-app.use('/api/payments/webhook', require('./routes/payments/webhook'));
-app.use('/api/payments/subscriptions', require('./routes/payments/subscriptions'));
 
 app.use('/api/questions', require('./routes/questions/questions'));
+app.use('/api/question-assignments', require('./routes/questions/questionAssignments'));
 app.use('/api/admin/questions', require('./routes/admin/questionsAdmin'));
-app.use('/api/patients', require('./routes/patient/patient'));
 
 app.use('/api/insurance-requests', require('./routes/insurance/insuranceRequests'))
 
@@ -174,9 +196,21 @@ app.use('/api/follow-ups', require('./routes/followUp/followUps'));
 app.use('/api/health-logs', require('./routes/healthLogs/healthLogs'));
 app.use('/api/consultation-history', require('./routes/consultationHistory/consultationHistory'));
 
-// Frontend entry
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, ".." ,'public', 'register.html'));
+app.use('/api/messages', require('./routes/messages/messages'));
+app.use('/api/notifications', require('./routes/notifications/notifications'));
+
+// 404 for anything that didn't match a route above.
+app.use((req, res) => {
+  res.status(404).json({ error: 'Not found.' });
+});
+
+// Final error handler — must be registered after every route so Express
+// actually reaches it. Logs the real error server-side but never sends
+// err.message to the client, since PG/validation errors can leak column
+// names, query fragments, or other internals.
+app.use((err, req, res, next) => {
+  console.error('[UNHANDLED ERROR]', err);
+  res.status(500).json({ error: 'Something went wrong. Please try again.' });
 });
 
 module.exports = app;

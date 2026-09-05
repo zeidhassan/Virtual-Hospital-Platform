@@ -11,7 +11,7 @@ import ErrorState from '@/components/ui/ErrorState';
 import { Star, Plus, Edit2, Trash2, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const BLANK_FORM = { name: '', description: '', monthly_price: '', yearly_price: '', currency: 'SAR', features: '' };
+const BLANK_FORM = { name: '', description: '', monthly_price: '', yearly_price: '', currency: 'MYR', features: '' };
 
 const AdminDoctorPlans = () => {
   const { data, isLoading, error, refetch } = useFetch(getAdminPlans);
@@ -29,7 +29,7 @@ const AdminDoctorPlans = () => {
       description:   plan.description   || '',
       monthly_price: plan.monthly_price != null ? String(plan.monthly_price) : '',
       yearly_price:  plan.yearly_price  != null ? String(plan.yearly_price)  : '',
-      currency:      plan.currency      || 'SAR',
+      currency:      plan.currency      || 'MYR',
       features:      plan.features      ? JSON.stringify(plan.features, null, 2) : '',
     });
     setModal(plan);
@@ -49,7 +49,7 @@ const AdminDoctorPlans = () => {
         description:   form.description || null,
         monthly_price: form.monthly_price ? parseFloat(form.monthly_price) : 0,
         yearly_price:  form.yearly_price  ? parseFloat(form.yearly_price)  : 0,
-        currency:      form.currency      || 'SAR',
+        currency:      form.currency      || 'MYR',
         features:      parsedFeatures,
       };
       if (modal === 'create') {
@@ -112,9 +112,9 @@ const AdminDoctorPlans = () => {
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <p className="font-semibold text-text-primary">{plan.name}</p>
                       <span className="text-xs text-text-muted">
-                        {plan.currency || 'SAR'} {Number(plan.monthly_price || 0).toFixed(2)}/mo
+                        {plan.currency || 'MYR'} {Number(plan.monthly_price || 0).toFixed(2)}/mo
                         {' · '}
-                        {plan.currency || 'SAR'} {Number(plan.yearly_price || 0).toFixed(2)}/yr
+                        {plan.currency || 'MYR'} {Number(plan.yearly_price || 0).toFixed(2)}/yr
                       </span>
                     </div>
                     {plan.description && (
@@ -175,7 +175,7 @@ const AdminDoctorPlans = () => {
             <Input label="Yearly Price" type="number" placeholder="0.00"
               value={form.yearly_price} onChange={(e) => setForm((f) => ({ ...f, yearly_price: e.target.value }))} />
           </div>
-          <Input label="Currency" placeholder="SAR"
+          <Input label="Currency" placeholder="MYR"
             value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))} />
           <div>
             <label className="text-xs font-medium text-text-secondary mb-1 block">

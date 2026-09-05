@@ -49,7 +49,8 @@ exports.getTopDoctorsByAppointments = async (req, res) => {
       values: result.rows.map(r => parseInt(r.count))
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };
 
@@ -99,6 +100,7 @@ exports.getSubscriptionDistribution = async (req, res) => {
       values: result.rows.map(r => parseInt(r.count))
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };

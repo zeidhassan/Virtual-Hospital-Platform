@@ -9,8 +9,8 @@ describe('Section 4 - Doctor Portal Integration Tests', () => {
 
   beforeAll(async () => {
     const [doctorRes, patientRes, adminRes] = await Promise.all([
-      request(app).post('/api/auth/login').send({ email: 'strange@helixacare.com', password: 'doctor123' }),
-      request(app).post('/api/auth/login').send({ email: 'jane@helixacare.com', password: 'patient123' }),
+      request(app).post('/api/auth/login').send({ email: 'strange@helixacare.com', password: 'admin123' }),
+      request(app).post('/api/auth/login').send({ email: 'jane@helixacare.com', password: 'admin123' }),
       request(app).post('/api/auth/login').send({ email: 'admin@helixacare.com', password: 'admin123' }),
     ]);
     doctorToken = doctorRes.body.token;
@@ -189,11 +189,17 @@ describe('Section 4 - Doctor Portal Integration Tests', () => {
         console.warn('No completed appointment found — skipping prescription creation test');
         return;
       }
+      const medRes = await request(app)
+        .get('/api/pharmacy-orders/medications/list')
+        .query({ name: 'Ibuprofen' })
+        .set('Authorization', `Bearer ${doctorToken}`);
+      const medicationId = medRes.body?.data?.[0]?.id;
+
       const res = await request(app)
         .post(`/api/doctor/appointments/${completedAppointmentId}/prescriptions`)
         .set('Authorization', `Bearer ${doctorToken}`)
         .send({
-          medication: 'Ibuprofen',
+          medication_id: medicationId,
           dosage: '200mg',
           pack_limit: 2,
           instructions: 'Twice daily after meals',
@@ -239,7 +245,7 @@ describe('Section 4 - Doctor Portal Integration Tests', () => {
         .get('/api/questions/doctor-responses')
         .set('Authorization', `Bearer ${doctorToken}`);
       expect(res.statusCode).toBe(200);
-      expect(Array.isArray(res.body)).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
     });
 
     it('rejects non-doctor accessing doctor-responses', async () => {
@@ -304,10 +310,10 @@ describe('Section 4 - Doctor Portal Integration Tests', () => {
         .get('/api/insurance-requests/doctor-pending')
         .set('Authorization', `Bearer ${doctorToken}`);
       expect(res.statusCode).toBe(200);
-      expect(Array.isArray(res.body)).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
 
       // Store a request ID for accept/reject tests
-      if (res.body.length > 0) insuranceRequestId = res.body[0].id;
+      if (res.body.data.length > 0) insuranceRequestId = res.body.data[0].id;
     });
 
     it('requires doctor role for /doctor-pending', async () => {
@@ -335,7 +341,7 @@ describe('Section 4 - Doctor Portal Integration Tests', () => {
         .post('/api/insurance-requests')
         .set('Authorization', `Bearer ${patientToken}`)
         .send({
-          insurance_company: 'BUPA Arabia',
+          insurance_company: 'MediLife Malaysia',
           insurance_id_number: 'TEST-REJECT-001',
           start_date: '2026-01-01',
           end_date: '2026-12-31',

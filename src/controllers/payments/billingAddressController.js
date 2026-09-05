@@ -9,7 +9,8 @@ exports.getBillingAddress = async (req, res) => {
     );
     res.json(result.rows[0] || null);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };
 
@@ -46,6 +47,7 @@ exports.saveBillingAddress = async (req, res) => {
     }
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };

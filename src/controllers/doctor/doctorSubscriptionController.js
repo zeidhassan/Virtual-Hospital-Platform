@@ -72,7 +72,8 @@ exports.createDoctorSubscription = async (req, res) => {
       message: 'Subscription submitted — pending admin approval',
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };
 
@@ -92,7 +93,8 @@ exports.getCurrentDoctorSubscription = async (req, res) => {
     if (result.rowCount === 0) return res.status(404).json({ error: 'No subscription found' });
     res.status(200).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };
 
@@ -130,6 +132,7 @@ exports.updateDoctorSubscription = async (req, res) => {
 
     res.status(400).json({ error: 'No valid update action provided' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };

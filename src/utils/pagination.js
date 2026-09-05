@@ -5,33 +5,41 @@
 const pool = require('../config/db');
 
 const VALID_SORT_COLUMNS = {
-  users: ['id', 'full_name', 'email', 'password_hash', 'role', 'phone', 'gender', 'date_of_birth', 'created_at', 'updated_at'],
+  users: ['id', 'full_name', 'email', 'password_hash', 'role', 'phone', 'gender', 'date_of_birth', 'profile_picture_url', 'login_attempts', 'locked_until', 'created_at', 'updated_at'],
   doctors: ['id', 'user_id', 'specialization', 'qualifications', 'availability_status', 'profile_picture_url', 'bio'],
   patients: ['id', 'user_id', 'blood_group', 'emergency_contact_name', 'emergency_contact_phone', 'address', 'allergies', 'chronic_conditions'],
-  appointments: ['id', 'patient_id', 'doctor_id', 'appointment_date', 'appointment_start_time', 'appointment_end_time', 'status', 'notes'],
+  appointments: ['id', 'patient_id', 'doctor_id', 'appointment_date', 'appointment_start_time', 'appointment_end_time', 'status', 'notes', 'appointment_type', 'triage_session_id', 'reminder_sent', 'completed_at', 'created_by'],
   doctor_time_slots: ['id', 'doctor_id', 'day_of_week', 'start_time', 'end_time'],
   appointment_status_logs: ['id', 'appointment_id', 'old_status', 'new_status', 'changed_at'],
-  prescriptions: ['id', 'appointment_id', 'medication', 'dosage', 'instructions', 'issued_date'],
+  prescriptions: ['id', 'appointment_id', 'medication_id', 'dosage', 'instructions', 'issued_date', 'refills_used', 'pack_limit', 'limit_reached'],
   medical_records: ['id', 'patient_id', 'doctor_id', 'appointment_id', 'record_type', 'description', 'file_url', 'created_at', 'private'],
-  bills: ['id', 'patient_id', 'amount', 'status', 'billing_date', 'details'],
+  bills: ['id', 'patient_id', 'amount', 'status', 'billing_date', 'details', 'currency', 'pharmacy_order_id'],
   plans: ['id', 'name', 'description', 'price', 'duration_days', 'features', 'currency'],
   subscriptions: ['id', 'patient_id', 'plan_name', 'start_date', 'end_date', 'auto_renew', 'status'],
-  messages: ['id', 'sender_id', 'receiver_id', 'message', 'timestamp', 'is_read'],
-  notifications: ['id', 'user_id', 'title', 'body', 'is_read', 'created_at'],
-  medications: ['id', 'name', 'type', 'description', 'price'],
-  pharmacy_orders: ['id', 'patient_id', 'prescription_id', 'medications', 'quantities', 'total_amount', 'status', 'prescription_file', 'delivery_address', 'payment_method', 'ordered_at'],
+  messages: ['id', 'conversation_id', 'sender_id', 'message', 'attachment_url', 'attachment_type', 'created_at'],
+  notifications: ['id', 'user_id', 'title', 'body', 'is_read', 'type', 'category', 'actor_name', 'actor_role', 'created_at'],
+  medications: ['id', 'name', 'type', 'description', 'price', 'photo_url'],
+  pharmacy_orders: ['id', 'patient_id', 'prescription_id', 'medications', 'quantities', 'total_amount', 'currency', 'status', 'prescription_file', 'delivery_address', 'payment_method', 'insurance_request_id', 'ordered_at'],
   question_bank: ['id', 'question_text', 'question_type', 'specialty', 'suggested_by', 'is_approved', 'created_at'],
   patient_question_responses: ['id', 'patient_id', 'question_id', 'answer', 'created_at'],
   doctor_response_notes: ['id', 'doctor_id', 'response_id', 'note', 'created_at'],
   doctor_plans: ['id', 'name', 'description', 'monthly_price', 'yearly_price', 'features', 'currency', 'created_at'],
   doctor_subscriptions: ['id', 'user_id', 'plan_id', 'billing_cycle', 'status', 'paperwork_url', 'start_date', 'end_date', 'admin_notes', 'created_at', 'updated_at'],
-  insurance_requests: ['id', 'patient_id', 'doctor_id', 'bill_id', 'insurance_company', 'insurance_id_number', 'start_date', 'end_date', 'status', 'created_at'],
-  support_tickets: ['id', 'user_id', 'subject', 'description', 'status', 'created_at', 'updated_at'],
-  support_ticket_replies: ['id', 'ticket_id', 'user_id', 'message', 'file_url', 'doctor_assigned', 'patient_assigned', 'created_at'],
+  insurance_requests: ['id', 'patient_id', 'doctor_id', 'bill_id', 'insurance_company', 'insurance_id_number', 'start_date', 'end_date', 'status', 'reviewed_by', 'created_at'],
+  support_tickets: ['id', 'user_id', 'category', 'subject', 'description', 'status', 'file_url', 'doctor_assigned', 'patient_assigned', 'created_at', 'updated_at', 'admin_read_at'],
+  support_ticket_replies: ['id', 'ticket_id', 'user_id', 'message', 'file_url', 'created_at'],
   services: ['id', 'name', 'description', 'cost'],
   health_programs: ['id', 'name', 'description', 'start_date', 'end_date', 'eligibility'],
-  follow_up_schedules: ['id', 'patient_id', 'doctor_id', 'appointment_id', 'triage_session_id', 'created_by', 'scheduled_date', 'notes', 'status', 'reminder_sent', 'created_at'],
   health_logs: ['id', 'patient_id', 'log_type', 'data', 'notes', 'logged_at'],
+  triage_sessions: ['id', 'patient_id', 'symptoms_text', 'urgency_level', 'recommended_action', 'recommended_department', 'follow_up_recommended', 'escalated_to_doctor_id', 'created_at'],
+  triage_symptom_rules: ['id', 'urgency_level', 'keywords', 'recommended_action', 'recommended_department', 'created_at', 'updated_at'],
+  patient_insurance: ['id', 'patient_id', 'insurance_company', 'insurance_id_number', 'start_date', 'end_date', 'is_active', 'created_at', 'updated_at'],
+  payment_methods: ['id', 'user_id', 'provider', 'cardholder_name', 'brand', 'last4', 'exp_month', 'exp_year', 'status', 'is_default', 'created_at', 'updated_at'],
+  payment_transactions: ['id', 'user_id', 'bill_id', 'doctor_subscription_id', 'amount', 'currency', 'method_type', 'fpx_bank', 'payment_method_id', 'transaction_ref', 'status', 'created_at'],
+  billing_addresses: ['id', 'user_id', 'addr_type', 'first_name', 'last_name', 'line1', 'line2', 'city', 'region', 'postal_code', 'country_code', 'email', 'phone', 'is_default', 'created_at', 'updated_at'],
+  conversations: ['id', 'title', 'is_group', 'created_by', 'created_at', 'updated_at'],
+  conversation_participants: ['id', 'conversation_id', 'user_id', 'joined_at', 'last_read_at', 'is_pinned'],
+  question_assignments: ['id', 'question_id', 'patient_id', 'doctor_id', 'response_id', 'assigned_at'],
 };
 
 module.exports = async function paginate({
@@ -78,14 +86,21 @@ module.exports = async function paginate({
   let whereClause = '';
   const queryParams = [];
 
-  console.log('[Filters Input]', filters);
-
+  // Filter keys are interpolated directly into the query below, so every key
+  // must look like a plain column name or an "alias.column" pair — nothing
+  // else. This doesn't check the key belongs to any particular table (many
+  // callers legitimately filter on a joined table's column), it just makes
+  // sure a key can never be a SQL fragment — the thing that would turn
+  // `filters: { ...req.query }` into an injection instead of a bad filter.
+  const SAFE_FILTER_KEY = /^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)?$/;
 
   if (filters && typeof filters === 'object') {
     const conditions = [];
 
     Object.entries(filters).forEach(([column, value]) => {
-      console.log(`Evaluating filter: ${column} =`, value);
+      if (value !== undefined && value !== '' && !SAFE_FILTER_KEY.test(column)) {
+        throw new Error(`Invalid filter key: ${column}`);
+      }
       if (value !== undefined && value !== '') {
         if (value === "true" || value === "false") {
           // Handle boolean values
@@ -146,8 +161,6 @@ module.exports = async function paginate({
     const dataResult = await pool.query(dataQuery, [...queryParams, limitINT, offset]);
     const countResult = await pool.query(countQuery, queryParams);
     const total = parseInt(countResult.rows[0].total);
-
-    console.log(`Data Query: ${dataQuery}`);
 
     return {
       currentPage: pageInt,

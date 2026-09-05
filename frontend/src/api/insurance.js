@@ -8,19 +8,30 @@ export const getMyInsuranceRequests = (params = {}) =>
 export const submitInsuranceRequest = (data) =>
   apiClient.post('/insurance-requests', data);
 
+// Patient: check for active (accepted) insurance coverage
+export const getActiveInsurance = () =>
+  apiClient.get('/insurance-requests/active');
+
+// Patient: persistent insurance policy
+export const getMyPolicy = () =>
+  apiClient.get('/insurance-requests/policy');
+
+export const saveMyPolicy = (data) =>
+  apiClient.post('/insurance-requests/policy', data);
+
+export const cancelMyPolicy = () =>
+  apiClient.delete('/insurance-requests/policy');
+
 // Admin: all requests
 export const getInsuranceRequests = (params = {}) =>
   apiClient.get('/insurance-requests', { params });
 
-export const createInsuranceRequest = (data) =>
-  apiClient.post('/insurance-requests', data);
+// Doctor or Admin: accept/reject
+export const acceptInsuranceRequest = (id) =>
+  apiClient.post(`/insurance-requests/${id}/accept`);
 
-export const updateInsuranceRequest = (id, data) =>
-  apiClient.patch(`/insurance-requests/${id}`, data);
+export const rejectInsuranceRequest = (id, data = {}) =>
+  apiClient.post(`/insurance-requests/${id}/reject`, data);
 
 export const getInsuranceStats = () =>
-  apiClient.get('/insurance-requests/stats');
-
-// Patient: check for active (accepted) insurance coverage
-export const getActiveInsurance = () =>
-  apiClient.get('/insurance-requests/active');
+  apiClient.get('/admin/insurance/stats');

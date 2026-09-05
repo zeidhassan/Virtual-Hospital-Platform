@@ -5,14 +5,16 @@ const pool = require('../../config/db');
 const { encrypt, decrypt } = require('../../utils/encrypt');
 const { uploadMedicalRecord } = require('../../middleware/uploadMiddleware');
 const paginate = require('../../utils/pagination')
+const { checkAppointmentConflict } = require('../../utils/appointmentAvailability');
 
 exports.getDoctorAppointments = async (req, res) => {
   const userId = req.user.id;
-  const doctorResult = await pool.query('SELECT id FROM doctors WHERE user_id = $1', [userId]);
-  if (doctorResult.rows.length === 0) return res.status(404).json({ error: 'Doctor not found.' });
-  const doctorId = doctorResult.rows[0].id;
 
   try {
+    const doctorResult = await pool.query('SELECT id FROM doctors WHERE user_id = $1', [userId]);
+    if (doctorResult.rows.length === 0) return res.status(404).json({ error: 'Doctor not found.' });
+    const doctorId = doctorResult.rows[0].id;
+
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const sort = req.query.sort || '-appointment_date';
@@ -24,13 +26,14 @@ exports.getDoctorAppointments = async (req, res) => {
       "appointment_start_time",
       "appointment_end_time",
       "status",
-      "notes"
+      "notes",
+      "appointment_type"
     ];
 
     const filters = {};
     for (const key in req.query) {
       if (validColumns.includes(key) && key !== 'page' && key !== 'limit' && key !== 'sort') {
-        filters[key] = req.query[key];
+        filters[`a.${key}`] = req.query[key];
       }
     }
 
@@ -40,7 +43,7 @@ exports.getDoctorAppointments = async (req, res) => {
       sort,
       limit,
       sortTable: 'a',
-      select: 'a.id, a.appointment_date, a.appointment_start_time, a.appointment_end_time, a.status, a.notes, u.full_name AS patient_name, a.patient_id',
+      select: 'a.id, a.appointment_date, a.appointment_start_time, a.appointment_end_time, a.status, a.notes, a.appointment_type, a.completed_at, a.triage_session_id, u.full_name AS patient_name, a.patient_id',
       join: `
         JOIN patients p ON a.patient_id = p.id
         JOIN users u ON p.user_id = u.id
@@ -56,6 +59,72 @@ exports.getDoctorAppointments = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error.' });
+  }
+};
+
+// Doctor reschedules one of their own appointments (any type — consultation,
+// follow-up, or triage-escalation). Unlike patient self-booking or an admin
+// reassign, a doctor rescheduling their own appointment isn't held to their
+// declared time slots — they may already know they're free outside them. The
+// only hard rule is not double-booking themselves.
+exports.rescheduleAppointment = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id } = req.params;
+    const { appointment_date, appointment_start_time, appointment_end_time } = req.body;
+
+    const doctorResult = await pool.query('SELECT id FROM doctors WHERE user_id = $1', [userId]);
+    if (doctorResult.rows.length === 0) return res.status(404).json({ error: 'Doctor not found.' });
+    const doctorId = doctorResult.rows[0].id;
+
+    const appointmentCheck = await pool.query('SELECT * FROM appointments WHERE id = $1 AND doctor_id = $2', [id, doctorId]);
+    if (appointmentCheck.rows.length === 0) return res.status(403).json({ error: 'Unauthorized.' });
+    const existing = appointmentCheck.rows[0];
+
+    if (['completed', 'cancelled'].includes(existing.status)) {
+      return res.status(400).json({ error: `Cannot reschedule an appointment with status '${existing.status}'.` });
+    }
+
+    if (!appointment_date && !appointment_start_time && !appointment_end_time) {
+      return res.status(400).json({ error: 'At least one of appointment_date, appointment_start_time, appointment_end_time is required.' });
+    }
+
+    const newDate = appointment_date || existing.appointment_date;
+    const newStart = appointment_start_time || existing.appointment_start_time;
+    const newEnd = appointment_end_time || existing.appointment_end_time;
+
+    if (newStart && newEnd) {
+      const availability = await checkAppointmentConflict(doctorId, newDate, newStart, newEnd, { excludeAppointmentId: existing.id });
+      if (!availability.ok) {
+        return res.status(400).json({ error: availability.error });
+      }
+    }
+
+    const newStatus = existing.status === 'missed' ? 'pending' : existing.status;
+
+    const result = await pool.query(
+      `UPDATE appointments
+       SET appointment_date = $1, appointment_start_time = $2, appointment_end_time = $3, status = $4, reminder_sent = FALSE
+       WHERE id = $5 RETURNING *`,
+      [newDate, newStart || null, newEnd || null, newStatus, id]
+    );
+
+    const patientUserRow = await pool.query('SELECT user_id FROM patients WHERE id = $1', [existing.patient_id]);
+    if (patientUserRow.rows.length > 0) {
+      await pool.query(
+        "INSERT INTO notifications (user_id, title, body, category) VALUES ($1, $2, $3, 'appointment')",
+        [
+          patientUserRow.rows[0].user_id,
+          'Appointment Rescheduled',
+          `Your appointment has been rescheduled to ${newDate}${newStart ? ` at ${newStart}` : ''}.`,
+        ]
+      );
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error rescheduling appointment:', err);
+    res.status(500).json({ error: 'Server error while rescheduling appointment.' });
   }
 };
 
@@ -80,7 +149,7 @@ exports.updateAppointmentStatus = async (req, res) => {
     if (patientUserRes.rows.length > 0) {
       const patientUserId = patientUserRes.rows[0].user_id;
       await pool.query(
-        'INSERT INTO notifications (user_id, title, body) VALUES ($1, $2, $3)',
+        "INSERT INTO notifications (user_id, title, body, category) VALUES ($1, $2, $3, 'appointment')",
         [
           patientUserId,
           'Appointment Status Updated',
@@ -135,7 +204,7 @@ exports.getAppointmentRecords = async (req, res) => {
         LEFT JOIN appointments a ON mr.appointment_id = a.id
       `,
       filters: {
-        'appointment_id': appointmentId,
+        'appointment_id': parseInt(appointmentId),
         'private': isPrivate
       },
     });
@@ -382,10 +451,13 @@ exports.generateMedicalRecord = async (req, res) => {
   }
 };
 
+// A prescription is always tied to a real catalog medication of type
+// 'prescription' — this is what makes the patient's later refill request
+// (in patientController.requestRefill) able to price and bill the order.
 exports.addPrescription = async (req, res) => {
   const userId = req.user.id;
   const { appointmentId } = req.params;
-  const { medication, dosage, pack_limit, instructions, issued_date } = req.body;
+  const { medication_id, dosage, pack_limit, instructions, issued_date } = req.body;
 
   const doctorResult = await pool.query('SELECT id FROM doctors WHERE user_id = $1', [userId]);
   if (doctorResult.rows.length === 0) return res.status(404).json({ error: 'Doctor not found.' });
@@ -395,6 +467,15 @@ exports.addPrescription = async (req, res) => {
   if (appointmentCheck.rows.length === 0) return res.status(403).json({ error: 'Unauthorized.' });
 
   try {
+    if (!medication_id) {
+      return res.status(400).json({ error: 'medication_id is required.' });
+    }
+
+    const medRes = await pool.query('SELECT id, name, type FROM medications WHERE id = $1', [medication_id]);
+    if (medRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Medication not found.' });
+    }
+
     // Check if the appointment is completed
     const appointmentCheck = await pool.query(
       `SELECT status FROM appointments WHERE id = $1`,
@@ -413,9 +494,9 @@ exports.addPrescription = async (req, res) => {
 
     // Insert prescription
     const result = await pool.query(
-      `INSERT INTO prescriptions (appointment_id, medication, dosage, pack_limit, instructions, issued_date)
+      `INSERT INTO prescriptions (appointment_id, medication_id, dosage, pack_limit, instructions, issued_date)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [appointmentId, medication, dosage, pack_limit, encryptedInstructions, issued_date]
+      [appointmentId, medication_id, dosage, pack_limit || 0, encryptedInstructions, issued_date]
     );
 
     res.status(201).json({
@@ -425,5 +506,58 @@ exports.addPrescription = async (req, res) => {
   } catch (err) {
     console.error('Error adding prescription:', err);
     res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// Doctor directly schedules an appointment with one of their patients — currently
+// used to schedule a consult from an escalated triage case, so it's recorded as a
+// 'triage_escalation' appointment linked back to the originating triage session.
+// Like a doctor's own reschedule, this isn't held to their declared time slots —
+// only checked for a conflict with another of their appointments.
+exports.createAppointmentForPatient = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const doctorResult = await pool.query('SELECT id FROM doctors WHERE user_id = $1', [userId]);
+    if (doctorResult.rows.length === 0) return res.status(404).json({ error: 'Doctor not found.' });
+    const doctorId = doctorResult.rows[0].id;
+
+    const { patient_id, appointment_date, appointment_start_time, appointment_end_time, notes, triage_session_id } = req.body;
+
+    if (!patient_id || !appointment_date || !appointment_start_time || !appointment_end_time) {
+      return res.status(400).json({ error: 'patient_id, appointment_date, appointment_start_time, and appointment_end_time are required.' });
+    }
+
+    const patientCheck = await pool.query('SELECT id FROM patients WHERE id = $1', [patient_id]);
+    if (patientCheck.rows.length === 0) return res.status(404).json({ error: 'Patient not found.' });
+
+    const availability = await checkAppointmentConflict(doctorId, appointment_date, appointment_start_time, appointment_end_time);
+    if (!availability.ok) {
+      return res.status(400).json({ error: availability.error });
+    }
+
+    const appointmentType = triage_session_id ? 'triage_escalation' : 'consultation';
+
+    const result = await pool.query(
+      `INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_start_time, appointment_end_time, status, notes, appointment_type, triage_session_id, created_by)
+       VALUES ($1, $2, $3, $4, $5, 'confirmed', $6, $7, $8, $9) RETURNING *`,
+      [patient_id, doctorId, appointment_date, appointment_start_time, appointment_end_time, notes || null, appointmentType, triage_session_id || null, userId]
+    );
+
+    const patientUserRow = await pool.query('SELECT user_id FROM patients WHERE id = $1', [patient_id]);
+    if (patientUserRow.rows.length > 0) {
+      await pool.query(
+        "INSERT INTO notifications (user_id, title, body, category) VALUES ($1, $2, $3, 'appointment')",
+        [
+          patientUserRow.rows[0].user_id,
+          'Appointment Scheduled',
+          `Your doctor has scheduled an appointment for you on ${appointment_date} at ${appointment_start_time}.`,
+        ]
+      );
+    }
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('Error creating appointment:', err);
+    res.status(500).json({ error: 'Server error while creating appointment.' });
   }
 };

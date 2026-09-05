@@ -68,13 +68,13 @@ exports.createSupportTicket = async (req, res) => {
     return res.status(403).json({ error: 'Only admins can create support tickets.' });
   }
 
-  const { user_id, subject, description, status, file_url, doctor_assigned, patient_assigned } = req.body;
+  const { user_id, category, subject, description, status, file_url, doctor_assigned, patient_assigned } = req.body;
 
   try {
     const result = await pool.query(
-      `INSERT INTO support_tickets (user_id, subject, description, status, file_url, doctor_assigned, patient_assigned)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [user_id, subject, description, status, file_url, doctor_assigned, patient_assigned]
+      `INSERT INTO support_tickets (user_id, category, subject, description, status, file_url, doctor_assigned, patient_assigned)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [user_id, category, subject, description, status, file_url, doctor_assigned, patient_assigned]
     );
 
     res.status(201).json(result.rows[0]);
@@ -89,14 +89,14 @@ exports.updateSupportTicket = async (req, res) => {
     return res.status(403).json({ error: 'Only admins can update support tickets.' });
   }
 
-  const { subject, description, status, file_url, doctor_assigned, patient_assigned } = req.body;
+  const { category, subject, description, status, file_url, doctor_assigned, patient_assigned } = req.body;
 
   try {
     const result = await pool.query(
-      `UPDATE support_tickets 
-       SET subject = $1, description = $2, status = $3, file_url = $4, doctor_assigned = $5, patient_assigned = $6
-       WHERE id = $7 RETURNING *`,
-      [subject, description, status, file_url, doctor_assigned, patient_assigned, req.params.id]
+      `UPDATE support_tickets
+       SET category = $1, subject = $2, description = $3, status = $4, file_url = $5, doctor_assigned = $6, patient_assigned = $7
+       WHERE id = $8 RETURNING *`,
+      [category, subject, description, status, file_url, doctor_assigned, patient_assigned, req.params.id]
     );
 
     if (result.rows.length === 0) {

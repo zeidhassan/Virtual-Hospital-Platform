@@ -1,6 +1,12 @@
 const pool = require('../../config/db'); // PostgreSQL connection pool
 const handleDbError = require('../../utils/handleDbError');
 const paginate = require('../../utils/pagination'); // Pagination utility
+const { encrypt, decrypt } = require('../../utils/encrypt');
+
+// instructions is stored encrypted (matching every other controller that
+// writes/reads this column) — the generic board previously read/wrote it as
+// plain text, which corrupted the field for every other reader.
+const decryptRecord = (row) => (row ? { ...row, instructions: decrypt(row.instructions) } : row);
 
 // GET all prescriptions (admin only)
 exports.getAllPrescriptions = async (req, res) => {
@@ -12,10 +18,13 @@ exports.getAllPrescriptions = async (req, res) => {
     const validColumns = [
       "id",
       "appointment_id",
-      "medication",
+      "medication_id",
       "dosage",
       "instructions",
-      "issued_date"
+      "issued_date",
+      "refills_used",
+      "pack_limit",
+      "limit_reached"
     ];
 
     const filters = {};
@@ -33,7 +42,7 @@ exports.getAllPrescriptions = async (req, res) => {
       filters
     });
 
-    res.json(result);
+    res.json({ ...result, data: result.data.map(decryptRecord) });
   } catch (err) {
     console.error('Pagination error:', err.message);
     res.status(400).json({ error: 'Pagination failed: ' + err.message });
@@ -53,7 +62,7 @@ exports.getPrescriptionById = async (req, res) => {
       return res.status(404).json({ error: 'Prescription not found' });
     }
 
-    res.json(result.rows[0]);
+    res.json(decryptRecord(result.rows[0]));
   } catch (err) {
     return handleDbError(err, res);
   }
@@ -65,16 +74,16 @@ exports.createPrescription = async (req, res) => {
     return res.status(403).json({ error: 'Only admins can create prescriptions.' });
   }
 
-  const { appointment_id, medication, dosage, instructions, issued_date } = req.body;
+  const { appointment_id, medication_id, dosage, instructions, issued_date, refills_used, pack_limit, limit_reached } = req.body;
 
   try {
     const result = await pool.query(
-      `INSERT INTO prescriptions (appointment_id, medication, dosage, instructions, issued_date)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [appointment_id, medication, dosage, instructions, issued_date]
+      `INSERT INTO prescriptions (appointment_id, medication_id, dosage, instructions, issued_date, refills_used, pack_limit, limit_reached)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [appointment_id, medication_id, dosage, encrypt(instructions), issued_date, refills_used, pack_limit, limit_reached]
     );
 
-    res.status(201).json(result.rows[0]);
+    res.status(201).json(decryptRecord(result.rows[0]));
   } catch (err) {
     return handleDbError(err, res);
   }
@@ -86,21 +95,21 @@ exports.updatePrescription = async (req, res) => {
     return res.status(403).json({ error: 'Only admins can update prescriptions.' });
   }
 
-  const { medication, dosage, instructions, issued_date } = req.body;
+  const { medication_id, dosage, instructions, issued_date, refills_used, pack_limit, limit_reached } = req.body;
 
   try {
     const result = await pool.query(
-      `UPDATE prescriptions 
-       SET medication=$1, dosage=$2, instructions=$3, issued_date=$4
-       WHERE id=$5 RETURNING *`,
-      [medication, dosage, instructions, issued_date, req.params.id]
+      `UPDATE prescriptions
+       SET medication_id=$1, dosage=$2, instructions=$3, issued_date=$4, refills_used=$5, pack_limit=$6, limit_reached=$7
+       WHERE id=$8 RETURNING *`,
+      [medication_id, dosage, encrypt(instructions), issued_date, refills_used, pack_limit, limit_reached, req.params.id]
     );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Prescription not found' });
     }
 
-    res.json(result.rows[0]);
+    res.json(decryptRecord(result.rows[0]));
   } catch (err) {
     return handleDbError(err, res);
   }

@@ -121,10 +121,10 @@ exports.createAppointment = async (req, res) => {
 
       // Insert appointment
       const insertResult = await pool.query(
-        `INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_start_time, appointment_end_time, status, notes)
-       VALUES ($1, $2, $3, $4, $5, 'pending', $6)
+        `INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_start_time, appointment_end_time, status, notes, appointment_type, created_by)
+       VALUES ($1, $2, $3, $4, $5, 'pending', $6, 'consultation', $7)
        RETURNING *`,
-        [patient_id, doctor_id, appointment_date, appointment_start_time, appointment_end_time, notes]
+        [patient_id, doctor_id, appointment_date, appointment_start_time, appointment_end_time, notes, user_id]
       );
 
       const appointment_id = insertResult.rows[0].id;
@@ -140,7 +140,7 @@ exports.createAppointment = async (req, res) => {
 
         // Create notification for doctor
         await pool.query(
-          'INSERT INTO notifications (user_id, title, body) VALUES ($1, $2, $3)',
+          "INSERT INTO notifications (user_id, title, body, category) VALUES ($1, $2, $3, 'appointment')",
           [
             doctor_user_id,
             'New Appointment Booked',
@@ -254,13 +254,14 @@ exports.getPatientAppointments = async (req, res) => {
       "appointment_start_time",
       "appointment_end_time",
       "status",
-      "notes"
+      "notes",
+      "appointment_type"
     ];
 
     const filters = {};
     for (const key in req.query) {
       if (validColumns.includes(key) && key !== 'page' && key !== 'limit' && key !== 'sort') {
-        filters[key] = req.query[key];
+        filters[`a.${key}`] = req.query[key];
       }
     }
 
@@ -269,12 +270,12 @@ exports.getPatientAppointments = async (req, res) => {
       table: 'appointments a',
       select: `
         a.id, a.appointment_date, a.appointment_start_time, a.appointment_end_time,
-        a.status, a.notes,
+        a.status, a.notes, a.appointment_type, a.completed_at, a.triage_session_id,
         u.full_name AS doctor_name, d.specialization
       `,
       join: `
-        JOIN doctors d ON a.doctor_id = d.id
-        JOIN users u ON d.user_id = u.id
+        LEFT JOIN doctors d ON a.doctor_id = d.id
+        LEFT JOIN users u ON d.user_id = u.id
       `,
       filters: {
         'a.patient_id': patientId,
@@ -336,8 +337,8 @@ exports.cancelAppointmentByPatient = async (req, res) => {
 
       // Insert notification for doctor
       await pool.query(
-        `INSERT INTO notifications (user_id, title, body)
-         VALUES ($1, $2, $3)`,
+        `INSERT INTO notifications (user_id, title, body, category)
+         VALUES ($1, $2, $3, 'appointment')`,
         [
           doctor_user_id,
           'Appointment Cancelled',
@@ -414,144 +415,3 @@ exports.viewMedicalRecords = async (req, res) => {
   }
 };
 
-// NEW
-exports.getPrescribedMedications = async (req, res) => {
-  const { appointmentId } = req.params;
-
-  try {
-    // Check if the appointment is completed
-    const appointmentCheck = await pool.query(
-      `SELECT status FROM appointments WHERE id = $1`,
-      [appointmentId]
-    );
-
-    if (appointmentCheck.rowCount === 0) {
-      return res.status(404).json({ error: 'Appointment not found' });
-    }
-
-    if (appointmentCheck.rows[0].status.toLowerCase() !== 'completed') {
-      return res.status(400).json({ error: 'Prescription can only be added after appointment is marked as completed.' });
-    }
-
-    const result = await paginate({
-      table: 'prescriptions',
-      page: parseInt(req.query.page) || 1,
-      limit: parseInt(req.query.limit) || 10,
-      sort: req.query.sort || '+id',
-      sortTable: 'p',
-      join: `
-        As p JOIN medications m ON p.medication = m.name
-      `,
-      select: `
-        p.id, p.appointment_id, p.medication, p.dosage, p.instructions, p.pack_limit, p.limit_reached, m.price
-      `,
-      filters: {
-        "appointment_id": req.params.appointmentId,
-      }
-    });
-    res.json(result);
-  } catch (err) {
-    console.error('[getAllOrders]', err.message);
-    res.status(500).json({ error: 'Failed to fetch orders.' });
-  }
-};
-
-// NEW
-exports.buyMedication = async (req, res) => {
-  const { appointmentId } = req.params;
-
-  const { name } = req.body;
-
-  // Check if the appointment is completed
-  const appointmentCheck = await pool.query(
-    `SELECT status FROM appointments WHERE id = $1`,
-    [appointmentId]
-  );
-
-  if (appointmentCheck.rowCount === 0) {
-    return res.status(404).json({ error: 'Appointment not found' });
-  }
-
-  if (appointmentCheck.rows[0].status.toLowerCase() !== 'completed') {
-    return res.status(400).json({ error: 'Prescription can only be added after appointment is marked as completed.' });
-  }
-
-  // Fetch patient ID from authenticated user
-  const patientRes = await pool.query(
-    'SELECT id FROM patients WHERE user_id = $1',
-    [req.user.id]
-  );
-
-  if (patientRes.rowCount === 0) {
-    return res.status(404).json({ error: 'Patient not found' });
-  }
-
-  const patientId = patientRes.rows[0].id;
-
-  const prescriptionQuery = `
-    SELECT medication, dosage, pack_limit, limit_reached 
-    FROM prescriptions 
-    WHERE appointment_id = $1 
-      AND LOWER(medication) = LOWER($2)
-  `;
-
-  const historyQuery = `
-    SELECT COUNT(*)
-    FROM pharmacy_orders po
-    JOIN prescriptions p ON
-      ',' || LOWER(po.medications) || ',' LIKE '%,' || LOWER(p.medication) || ',%'
-    WHERE po.patient_id = $1
-      AND LOWER(p.medication) = LOWER($2)
-      AND po.status = 'delivered'
-      AND po.ordered_at BETWEEN p.issued_date AND NOW();
-  `;
-
-  const medicationQuery = `
-    SELECT price 
-    FROM medications 
-    WHERE LOWER(name) = LOWER($1)
-  `;
-
-  const OrderQuery = `
-    INSERT INTO pharmacy_orders (patient_id, medications, total_amount, status, prescription_file, ordered_at)
-    VALUES ($1, $2, $3, 'approved', $4, NOW())
-    RETURNING *
-  `;
-
-  const medicationInfo = await pool.query(prescriptionQuery, [appointmentId, name]);
-
-  if (medicationInfo.rows.length === 0) {
-    return res.status(404).json({ error: 'Medication not found in prescriptions.' });
-  }
-
-  const { medication, dosage, pack_limit, limit_reached } = medicationInfo.rows[0];
-
-  // Check if medication limit is reached
-  if (limit_reached) {
-    return res.status(403).json({ error: 'Medication limit reached for this prescription.' });
-  }
-
-  const historyCount = await pool.query(historyQuery, [patientId, name]);
-
-  if (parseInt(historyCount.rows[0].count) >= pack_limit) {
-    // Update prescription to mark limit as reached
-    await pool.query(`
-      UPDATE prescriptions 
-      SET limit_reached = TRUE 
-      WHERE appointment_id = $1 AND LOWER(medication) = LOWER($2)
-    `, [appointmentId, name]);
-    return res.status(403).json({ error: 'Medication purchase limit reached for this medication.' });
-  }
-
-  const medicationPrice = await pool.query(medicationQuery, [name]);
-  if (medicationPrice.rows.length === 0) {
-    return res.status(404).json({ error: 'Medication not found.' });
-  }
-
-  const { price } = medicationPrice.rows[0];
-  const prescriptionDetails = `${medication} (${dosage})`;
-
-  // Create a new order
-  const order = await pool.query(OrderQuery, [patientId, name, price, prescriptionDetails]);
-  res.status(201).json({ message: 'Medication ordered successfully.', order: order.rows[0] });
-};

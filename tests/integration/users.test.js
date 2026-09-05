@@ -45,12 +45,14 @@ describe('User Management API Tests (Basic User Table Only)', () => {
     expect(res.body).toHaveProperty('email', testEmail);
     expect(res.body).toHaveProperty('full_name', 'Test User');
     expect(res.body).toHaveProperty('role', 'patient');
-    expect(res.body).not.toHaveProperty('blood_group'); // not expected anymore
+    // Registration now creates a matching patients row for every new
+    // account, so a freshly-registered patient's own profile correctly
+    // includes their (still-empty) patient fields.
+    expect(res.body).toHaveProperty('blood_group', null);
   });
 
   afterAll(async () => {
+    await pool.query('DELETE FROM patients WHERE user_id = (SELECT id FROM users WHERE email = $1)', [testEmail]);
     await pool.query('DELETE FROM users WHERE email = $1', [testEmail]);
-    await pool.query('DELETE FROM user_passwords WHERE email = $1', [testEmail]);
-    await pool.end();
   });
 });

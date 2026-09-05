@@ -1,42 +1,11 @@
 // routes/admin/admin.js
+//
+// This module used to host GET /api/admin/passwords, which exposed every
+// user's plaintext password via user_passwords — that table and endpoint
+// have been removed entirely (see src/controllers/authentication/authController.js
+// for where the plaintext write used to happen). Left as an empty router
+// since app.js still mounts '/api/admin' here.
 const express = require('express');
 const router = express.Router();
-const adminPasswordsController = require('../../controllers/admin/adminPasswordsController');
-const requireRole = require('../../middleware/requireRole');
-const verifyToken = require('../../middleware/verifyToken')
-router.use(verifyToken);
-
-// GET /api/admin/passwords
-
-/**
- * @swagger
- * /api/admin/passwords:
- *   get:
- *     summary: Retrieve all plaintext passwords (admin only)
- *     tags: [Admin]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Successfully retrieved all user passwords
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: integer
- *                   email:
- *                     type: string
- *                   password:
- *                     type: string
- *       403:
- *         description: Forbidden - Admin access required
- *       401:
- *         description: Unauthorized - Missing or invalid token
- */
-router.get('/passwords', requireRole('admin'), adminPasswordsController.getPlainPasswords);
 
 module.exports = router;

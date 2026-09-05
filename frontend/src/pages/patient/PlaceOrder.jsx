@@ -20,7 +20,6 @@ const PlaceOrder = () => {
   const [medications, setMedications] = useState([]);
   // cart: { [medId]: { id, name, type, price, quantity } }
   const [cart, setCart] = useState({});
-  const [file, setFile] = useState(null);
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [insurance, setInsurance] = useState(null); // { hasInsurance, insurance }
@@ -29,7 +28,7 @@ const PlaceOrder = () => {
 
   useEffect(() => {
     Promise.all([
-      getMedications({ limit: 100 }),
+      getMedications({ type: 'countertop', limit: 100 }),
       getActiveInsurance(),
     ])
       .then(([medsRes, insRes]) => {
@@ -68,7 +67,6 @@ const PlaceOrder = () => {
   };
 
   const selectedItems = Object.values(cart).filter((m) => m.quantity > 0);
-  const requiresFile = selectedItems.some((m) => m.type === 'prescription');
   const totalAmount = selectedItems.reduce((sum, m) => sum + m.price * m.quantity, 0);
 
   const handleSubmit = async (e) => {
@@ -79,10 +77,6 @@ const PlaceOrder = () => {
     }
     if (!deliveryAddress.trim()) {
       toast.error('Please enter a delivery address.');
-      return;
-    }
-    if (requiresFile && !file) {
-      toast.error('A prescription file is required for the selected medication(s).');
       return;
     }
     if (paymentMethod === 'insurance' && !insurance?.hasInsurance) {
@@ -96,7 +90,7 @@ const PlaceOrder = () => {
       const quantities = selectedItems.map((m) => m.quantity);
       const insuranceId = paymentMethod === 'insurance' ? insurance?.insurance?.id : null;
 
-      await placeOrder(names, quantities, file, deliveryAddress.trim(), paymentMethod, insuranceId);
+      await placeOrder(names, quantities, null, deliveryAddress.trim(), paymentMethod, insuranceId);
       toast.success('Order placed successfully!');
       navigate('/patient/my-orders');
     } catch (err) {
@@ -105,9 +99,6 @@ const PlaceOrder = () => {
       setSubmitting(false);
     }
   };
-
-  const countertop = medications.filter((m) => m.type !== 'prescription');
-  const prescription = medications.filter((m) => m.type === 'prescription');
 
   const MedCard = ({ med }) => {
     const count = qty(med.id);
@@ -128,15 +119,8 @@ const PlaceOrder = () => {
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <p className="text-sm font-medium text-text-primary">{med.name}</p>
-            {med.type === 'prescription' && (
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200 whitespace-nowrap">
-                Rx
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-text-muted mt-0.5">SAR {parseFloat(med.price).toFixed(2)}</p>
+          <p className="text-sm font-medium text-text-primary">{med.name}</p>
+          <p className="text-xs text-text-muted mt-0.5">MYR {parseFloat(med.price).toFixed(2)}</p>
         </div>
 
         {/* Qty controls */}
@@ -184,25 +168,13 @@ const PlaceOrder = () => {
       ) : (
         <form onSubmit={handleSubmit} className="space-y-5">
 
-          {/* Over-the-counter */}
-          {countertop.length > 0 && (
-            <Card>
-              <CardHeader title="Over-the-counter" />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
-                {countertop.map((med) => <MedCard key={med.id} med={med} />)}
-              </div>
-            </Card>
-          )}
-
-          {/* Prescription-only */}
-          {prescription.length > 0 && (
-            <Card>
-              <CardHeader title="Prescription only" />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
-                {prescription.map((med) => <MedCard key={med.id} med={med} />)}
-              </div>
-            </Card>
-          )}
+          {/* Over-the-counter medications */}
+          <Card>
+            <CardHeader title="Over-the-counter" subtitle="Prescription medications are ordered as refills from your Prescriptions page instead." />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
+              {medications.map((med) => <MedCard key={med.id} med={med} />)}
+            </div>
+          </Card>
 
           {/* Order summary */}
           {selectedItems.length > 0 && (
@@ -211,34 +183,16 @@ const PlaceOrder = () => {
               <ul className="space-y-1.5 text-sm">
                 {selectedItems.map((m) => (
                   <li key={m.id} className="flex justify-between text-text-secondary">
-                    <span>{m.name} {m.type === 'prescription' && <span className="text-amber-700 font-semibold text-xs">Rx</span>} × {m.quantity}</span>
-                    <span className="font-medium text-text-primary">SAR {(m.price * m.quantity).toFixed(2)}</span>
+                    <span>{m.name} × {m.quantity}</span>
+                    <span className="font-medium text-text-primary">MYR {(m.price * m.quantity).toFixed(2)}</span>
                   </li>
                 ))}
                 <li className="flex justify-between font-semibold text-text-primary border-t border-border pt-2 mt-2">
                   <span>Total</span>
-                  <span>SAR {totalAmount.toFixed(2)}</span>
+                  <span>MYR {totalAmount.toFixed(2)}</span>
                 </li>
               </ul>
             </Card>
-          )}
-
-          {/* Prescription file upload */}
-          {requiresFile && (
-            <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 space-y-2">
-              <p className="text-sm font-semibold text-amber-800">
-                Prescription File Required <span className="text-red-600">*</span>
-              </p>
-              <p className="text-xs text-amber-700">One or more selected medications require a valid doctor's prescription.</p>
-              <input
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={(e) => setFile(e.target.files[0])}
-                required
-                className="block w-full text-sm text-text-secondary file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-amber-600 file:text-white file:font-medium hover:file:bg-amber-700 file:cursor-pointer"
-              />
-              {file && <p className="text-xs text-amber-700">Selected: {file.name}</p>}
-            </div>
           )}
 
           {/* Delivery address */}
@@ -303,7 +257,7 @@ const PlaceOrder = () => {
           <div className="flex gap-3 pb-6">
             <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
             <Button type="submit" isLoading={submitting} disabled={selectedItems.length === 0 || submitting}>
-              Place Order {selectedItems.length > 0 && `(SAR ${totalAmount.toFixed(2)})`}
+              Place Order {selectedItems.length > 0 && `(MYR ${totalAmount.toFixed(2)})`}
             </Button>
           </div>
 

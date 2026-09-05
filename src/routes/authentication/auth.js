@@ -15,15 +15,19 @@ const frontendUrl = process.env.FRONTEND_URL;
 const registerLimiter = require('express-rate-limit')({
   windowMs: 15 * 60 * 1000, // 15 min
   max: 10,
-  message: { error: 'Too many registration attempts, try again later.' }
+  message: { error: 'Too many registration attempts, try again later.' },
+  skip: () => process.env.NODE_ENV === 'test', // disable in test env, matching loginLimiter — the suite registers many accounts
 });
 
 // Validation middleware
+// Public self-registration is patient-only — doctor and admin accounts are
+// created by an admin via the /api/adminBoard/users endpoint instead, which
+// is already gated behind requireRole('admin').
 const validateRegister = [
   body('full_name').trim().isLength({ min: 3 }).escape(),
   body('email').isEmail().normalizeEmail(),
   body('password').isLength({ min: 6 }),
-  body('role').isIn(['admin', 'doctor', 'patient']),
+  body('role').isIn(['patient']),
   (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });

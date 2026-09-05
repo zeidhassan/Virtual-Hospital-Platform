@@ -6,6 +6,7 @@ const ti  = (name, label)                              => ({ name, label, type: 
 const ta  = (name, label)                              => ({ name, label, type: 'textarea' });
 const sel = (name, label, options)                     => ({ name, label, type: 'select', options });
 const bool = (name, label)                             => sel(name, label, ['true', 'false']);
+const dtt = (name, label)                              => ({ name, label, type: 'datetime-local' });
 
 export const ENTITIES = [
   {
@@ -19,6 +20,9 @@ export const ENTITIES = [
       t('phone', 'Phone'),
       sel('gender', 'Gender', ['male', 'female', 'other']),
       dt('date_of_birth', 'Date of Birth'),
+      t('profile_picture_url', 'Profile Picture URL'),
+      num('login_attempts', 'Login Attempts'),
+      dtt('locked_until', 'Locked Until'),
     ],
   },
   {
@@ -55,8 +59,12 @@ export const ENTITIES = [
       dt('appointment_date', 'Appointment Date'),
       ti('appointment_start_time', 'Start Time'),
       ti('appointment_end_time', 'End Time'),
-      sel('status', 'Status', ['pending', 'confirmed', 'completed', 'cancelled', 'no_show']),
+      sel('status', 'Status', ['pending', 'confirmed', 'completed', 'cancelled', 'missed']),
       ta('notes', 'Notes'),
+      sel('appointment_type', 'Appointment Type', ['consultation', 'follow_up', 'triage_escalation']),
+      num('triage_session_id', 'Triage Session ID'),
+      num('created_by', 'Created By (User ID)'),
+      bool('reminder_sent', 'Reminder Sent'),
     ],
   },
   {
@@ -83,10 +91,13 @@ export const ENTITIES = [
     label: 'Prescriptions',
     fields: [
       num('appointment_id', 'Appointment ID'),
-      t('medication', 'Medication'),
+      num('medication_id', 'Medication ID'),
       t('dosage', 'Dosage'),
       ta('instructions', 'Instructions'),
       dt('issued_date', 'Issued Date'),
+      num('refills_used', 'Refills Used'),
+      num('pack_limit', 'Pack Limit'),
+      bool('limit_reached', 'Limit Reached'),
     ],
   },
   {
@@ -108,9 +119,11 @@ export const ENTITIES = [
     fields: [
       num('patient_id', 'Patient ID'),
       num('amount', 'Amount'),
-      sel('status', 'Status', ['pending', 'paid', 'overdue', 'cancelled']),
+      sel('status', 'Status', ['pending', 'paid', 'unpaid', 'overdue', 'cancelled']),
       dt('billing_date', 'Billing Date'),
       ta('details', 'Details'),
+      t('currency', 'Currency'),
+      num('pharmacy_order_id', 'Pharmacy Order ID'),
     ],
   },
   {
@@ -134,17 +147,18 @@ export const ENTITIES = [
       dt('start_date', 'Start Date'),
       dt('end_date', 'End Date'),
       bool('auto_renew', 'Auto Renew'),
-      sel('status', 'Status', ['active', 'cancelled', 'expired']),
+      sel('status', 'Status', ['active', 'insurance_pending', 'cancelled', 'expired']),
     ],
   },
   {
     key: 'messages',
     label: 'Messages',
     fields: [
+      num('conversation_id', 'Conversation ID'),
       num('sender_id', 'Sender ID'),
-      num('receiver_id', 'Receiver ID'),
       ta('message', 'Message'),
-      bool('is_read', 'Is Read'),
+      t('attachment_url', 'Attachment URL'),
+      sel('attachment_type', 'Attachment Type', ['image', 'pdf']),
     ],
   },
   {
@@ -155,6 +169,10 @@ export const ENTITIES = [
       t('title', 'Title'),
       ta('body', 'Body'),
       bool('is_read', 'Is Read'),
+      t('type', 'Type'),
+      t('category', 'Category'),
+      t('actor_name', 'Actor Name'),
+      t('actor_role', 'Actor Role'),
     ],
   },
   {
@@ -165,6 +183,7 @@ export const ENTITIES = [
       sel('type', 'Type', ['countertop', 'prescription']),
       ta('description', 'Description'),
       num('price', 'Price'),
+      t('photo_url', 'Photo URL'),
     ],
   },
   {
@@ -172,10 +191,16 @@ export const ENTITIES = [
     label: 'Pharmacy Orders',
     fields: [
       num('patient_id', 'Patient ID'),
+      num('prescription_id', 'Prescription ID'),
       t('medications', 'Medications (comma-separated)'),
+      t('quantities', 'Quantities (comma-separated)'),
       num('total_amount', 'Total Amount'),
-      sel('status', 'Status', ['pending', 'processing', 'completed', 'cancelled']),
+      t('currency', 'Currency'),
+      sel('status', 'Status', ['pending', 'processing', 'dispatched', 'delivered', 'cancelled']),
       t('prescription_file', 'Prescription File'),
+      ta('delivery_address', 'Delivery Address'),
+      t('payment_method', 'Payment Method'),
+      num('insurance_request_id', 'Insurance Request ID'),
     ],
   },
   {
@@ -183,7 +208,7 @@ export const ENTITIES = [
     label: 'Question Bank',
     fields: [
       ta('question_text', 'Question Text'),
-      t('question_type', 'Question Type'),
+      sel('question_type', 'Question Type', ['public', 'specialty']),
       t('specialty', 'Specialty'),
       num('suggested_by', 'Suggested By (User ID)'),
       bool('is_approved', 'Is Approved'),
@@ -226,7 +251,7 @@ export const ENTITIES = [
       num('user_id', 'User ID'),
       num('plan_id', 'Plan ID'),
       sel('billing_cycle', 'Billing Cycle', ['monthly', 'yearly']),
-      sel('status', 'Status', ['pending', 'approved', 'cancelled', 'expired']),
+      sel('status', 'Status', ['pending', 'approved', 'rejected', 'cancelled', 'paid']),
       t('paperwork_url', 'Paperwork URL'),
       dt('start_date', 'Start Date'),
       dt('end_date', 'End Date'),
@@ -244,7 +269,8 @@ export const ENTITIES = [
       t('insurance_id_number', 'Insurance ID Number'),
       dt('start_date', 'Start Date'),
       dt('end_date', 'End Date'),
-      sel('status', 'Status', ['pending', 'approved', 'rejected', 'accepted']),
+      sel('status', 'Status', ['pending', 'accepted', 'rejected']),
+      num('reviewed_by', 'Reviewed By (User ID)'),
     ],
   },
   {
@@ -252,9 +278,13 @@ export const ENTITIES = [
     label: 'Support Tickets',
     fields: [
       num('user_id', 'User ID'),
+      sel('category', 'Category', ['Technical', 'Medical', 'Billing', 'Appointments', 'Other']),
       t('subject', 'Subject'),
       ta('description', 'Description'),
-      sel('status', 'Status', ['open', 'in-progress', 'closed']),
+      sel('status', 'Status', ['pending', 'open', 'in progress', 'resolved', 'closed']),
+      t('file_url', 'File URL'),
+      num('doctor_assigned', 'Doctor Assigned (ID)'),
+      num('patient_assigned', 'Patient Assigned (ID)'),
     ],
   },
   {
@@ -265,8 +295,6 @@ export const ENTITIES = [
       num('user_id', 'User ID'),
       ta('message', 'Message'),
       t('file_url', 'File URL'),
-      num('doctor_assigned', 'Doctor Assigned (ID)'),
-      num('patient_assigned', 'Patient Assigned (ID)'),
     ],
   },
   {
@@ -287,6 +315,129 @@ export const ENTITIES = [
       dt('start_date', 'Start Date'),
       dt('end_date', 'End Date'),
       ta('eligibility', 'Eligibility'),
+    ],
+  },
+  {
+    key: 'health-logs',
+    label: 'Health Logs',
+    fields: [
+      num('patient_id', 'Patient ID'),
+      sel('log_type', 'Log Type', ['vitals', 'symptom_update', 'medication_adherence', 'general']),
+      ta('data', 'Data (JSON)'),
+      ta('notes', 'Notes'),
+    ],
+  },
+  {
+    key: 'patient-insurance',
+    label: 'Patient Insurance',
+    fields: [
+      num('patient_id', 'Patient ID'),
+      t('insurance_company', 'Insurance Company'),
+      t('insurance_id_number', 'Insurance ID Number'),
+      dt('start_date', 'Start Date'),
+      dt('end_date', 'End Date'),
+      bool('is_active', 'Is Active'),
+    ],
+  },
+  {
+    key: 'payment-methods',
+    label: 'Payment Methods',
+    fields: [
+      num('user_id', 'User ID'),
+      sel('provider', 'Provider', ['card', 'fpx']),
+      t('cardholder_name', 'Cardholder Name'),
+      t('brand', 'Brand'),
+      t('last4', 'Last 4 Digits'),
+      num('exp_month', 'Expiry Month'),
+      num('exp_year', 'Expiry Year'),
+      sel('status', 'Status', ['active', 'inactive']),
+      bool('is_default', 'Is Default'),
+    ],
+  },
+  {
+    key: 'payment-transactions',
+    label: 'Payment Transactions',
+    fields: [
+      num('user_id', 'User ID'),
+      num('bill_id', 'Bill ID'),
+      num('doctor_subscription_id', 'Doctor Subscription ID'),
+      num('amount', 'Amount'),
+      t('currency', 'Currency'),
+      sel('method_type', 'Method Type', ['card', 'fpx']),
+      t('fpx_bank', 'FPX Bank'),
+      num('payment_method_id', 'Payment Method ID'),
+      t('transaction_ref', 'Transaction Reference'),
+      sel('status', 'Status', ['success', 'failed', 'pending']),
+    ],
+  },
+  {
+    key: 'billing-addresses',
+    label: 'Billing Addresses',
+    fields: [
+      num('user_id', 'User ID'),
+      sel('addr_type', 'Address Type', ['billing', 'shipping']),
+      t('first_name', 'First Name'),
+      t('last_name', 'Last Name'),
+      t('line1', 'Address Line 1'),
+      t('line2', 'Address Line 2'),
+      t('city', 'City'),
+      t('region', 'Region'),
+      t('postal_code', 'Postal Code'),
+      t('country_code', 'Country Code'),
+      t('email', 'Email', 'email'),
+      t('phone', 'Phone'),
+      bool('is_default', 'Is Default'),
+    ],
+  },
+  {
+    key: 'conversations',
+    label: 'Conversations',
+    fields: [
+      t('title', 'Title'),
+      bool('is_group', 'Is Group'),
+      num('created_by', 'Created By (User ID)'),
+    ],
+  },
+  {
+    key: 'conversation-participants',
+    label: 'Conversation Participants',
+    fields: [
+      num('conversation_id', 'Conversation ID'),
+      num('user_id', 'User ID'),
+      bool('is_pinned', 'Is Pinned'),
+    ],
+  },
+  {
+    key: 'question-assignments',
+    label: 'Question Assignments',
+    fields: [
+      num('question_id', 'Question ID'),
+      num('patient_id', 'Patient ID'),
+      num('doctor_id', 'Doctor ID'),
+      num('response_id', 'Response ID'),
+    ],
+  },
+  {
+    key: 'triage-sessions',
+    label: 'Triage Sessions',
+    fields: [
+      num('patient_id', 'Patient ID'),
+      ta('symptoms_text', 'Symptoms'),
+      sel('urgency_level', 'Urgency Level', ['emergency', 'urgent', 'standard', 'self_care']),
+      ta('recommended_action', 'Recommended Action'),
+      t('recommended_department', 'Recommended Department'),
+      bool('follow_up_recommended', 'Follow-Up Recommended'),
+      num('escalated_to_doctor_id', 'Escalated To Doctor (ID)'),
+    ],
+  },
+  {
+    key: 'triage-symptom-rules',
+    label: 'Triage Symptom Rules',
+    fields: [
+      sel('urgency_level', 'Urgency Level', ['emergency', 'urgent', 'standard', 'self_care']),
+      ta('keywords', 'Keywords (comma-separated)'),
+      ta('recommended_action', 'Recommended Action'),
+      t('recommended_department', 'Recommended Department'),
     ],
   },
 ];

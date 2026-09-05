@@ -32,11 +32,14 @@ describe('App Initialization', () => {
     expect(res.headers['content-security-policy']).toBeDefined();
   });
 
-  test('should not apply CSP headers in development', async () => {
+  test('should not apply helmet CSP in development (Express 5 may add its own default)', async () => {
     jest.resetModules();
     process.env.NODE_ENV = 'development';
     const devApp = require('../../src/app');
-    const res = await request(devApp).get('/');
-    expect(res.headers['content-security-policy']).toBeUndefined();
+    const res = await request(devApp).get('/api-docs/');
+    // In development mode, helmet's strict production CSP should NOT be applied.
+    // Helmet production CSP uses default-src 'self'; Express 5 uses default-src 'none'.
+    const csp = res.headers['content-security-policy'] || '';
+    expect(csp).not.toMatch(/default-src 'self'/);
   });
 });

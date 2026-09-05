@@ -27,6 +27,10 @@ const fileController = require('../../controllers/Files/fileController');
  */
 router.get('/prescriptions/:filename', verifyToken, fileController.getPrescriptionFile);
 
-router.get('/medical-records/:filename', verifyToken, fileController.getPrescriptionFile);
+router.get('/medical-records/:filename', verifyToken, fileController.getMedicalRecordFile);
+
+router.get('/support-tickets/:filename', verifyToken, fileController.getSupportTicketFile);
+
+router.get('/messages/:filename', verifyToken, fileController.getMessageAttachmentFile);
 
 module.exports = router;

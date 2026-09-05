@@ -2,7 +2,39 @@
 // PATCH /api/profile
 // Body can include any subset of:
 // { email, full_name, phone_number, country, region, city, zip_code, avatar_url }
+const fs = require('fs');
+const path = require('path');
 const pool = require('../../config/db');
+
+// PATCH /api/profile/picture — multipart upload, replaces any existing picture
+exports.uploadProfilePicture = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized.' });
+    if (!req.file) return res.status(400).json({ error: 'No image file provided.' });
+
+    const newUrl = `uploads/profile-pictures/${req.file.filename}`;
+
+    const { rows: existingRows } = await pool.query('SELECT profile_picture_url FROM users WHERE id = $1', [userId]);
+    const oldUrl = existingRows[0]?.profile_picture_url;
+
+    const { rows } = await pool.query(
+      'UPDATE users SET profile_picture_url = $1, updated_at = NOW() WHERE id = $2 RETURNING id, profile_picture_url',
+      [newUrl, userId]
+    );
+
+    // Best-effort cleanup of the previous file
+    if (oldUrl) {
+      const oldPath = path.join(__dirname, '../../../', oldUrl);
+      fs.unlink(oldPath, () => {});
+    }
+
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('[uploadProfilePicture] Error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
 exports.getMyProfile = async (req, res) => {
   try {
@@ -11,13 +43,45 @@ exports.getMyProfile = async (req, res) => {
 
     // 1) Basic user info
     const { rows: urows } = await pool.query(
-      `SELECT id, full_name, email, phone, gender, date_of_birth, role, created_at, updated_at
+      `SELECT id, full_name, email, phone, gender, date_of_birth, profile_picture_url, role, created_at, updated_at
          FROM users
         WHERE id = $1`,
       [userId]
     );
     const user = urows[0];
     if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    // 1b) Role-specific fields, merged onto the same object so the frontend
+    // doesn't need to know which table each field actually lives in.
+    if (user.role === 'doctor') {
+      const { rows } = await pool.query(
+        'SELECT id, specialization, qualifications, availability_status, bio FROM doctors WHERE user_id = $1',
+        [userId]
+      );
+      const doc = rows[0] || {};
+      Object.assign(user, {
+        doctorId: doc.id,
+        specialization: doc.specialization,
+        qualifications: doc.qualifications,
+        availability_status: doc.availability_status,
+        bio: doc.bio,
+      });
+    } else if (user.role === 'patient') {
+      const { rows } = await pool.query(
+        'SELECT id, blood_group, emergency_contact_name, emergency_contact_phone, address, allergies, chronic_conditions FROM patients WHERE user_id = $1',
+        [userId]
+      );
+      const pat = rows[0] || {};
+      Object.assign(user, {
+        patientId: pat.id,
+        blood_group: pat.blood_group,
+        emergency_contact_name: pat.emergency_contact_name,
+        emergency_contact_phone: pat.emergency_contact_phone,
+        address: pat.address,
+        allergies: pat.allergies,
+        chronic_conditions: pat.chronic_conditions,
+      });
+    }
 
     // 2) All addresses for the user (billing + shipping)
     const { rows: addrRows } = await pool.query(
@@ -32,7 +96,7 @@ exports.getMyProfile = async (req, res) => {
     // 3) All payment methods for the user
     const { rows: pmRows } = await pool.query(
       `SELECT id, provider, cardholder_name, brand, last4, exp_month, exp_year,
-              paypal_payer_id, paypal_email, status, is_default, created_at, updated_at
+              status, is_default, created_at, updated_at
          FROM payment_methods
         WHERE user_id = $1
         ORDER BY is_default DESC, id ASC`,
@@ -176,8 +240,32 @@ exports.updateProfile = async (req, res) => {
       updates.date_of_birth = dob; // null clears it
     }
 
+    // Role-specific fields — stored on patients/doctors, not users. Collected
+    // separately so a patient editing only their allergy list (no users-table
+    // fields touched) isn't rejected as "nothing to update".
+    const role = req.user.role;
+    const roleUpdates = {};
+
+    if (role === 'patient') {
+      const patientFields = ['blood_group', 'emergency_contact_name', 'emergency_contact_phone', 'address', 'allergies', 'chronic_conditions'];
+      for (const f of patientFields) {
+        if (body[f] !== undefined) {
+          const v = String(body[f]).trim();
+          roleUpdates[f] = v || null;
+        }
+      }
+    } else if (role === 'doctor') {
+      const doctorFields = ['specialization', 'qualifications', 'bio'];
+      for (const f of doctorFields) {
+        if (body[f] !== undefined) {
+          const v = String(body[f]).trim();
+          roleUpdates[f] = v || null;
+        }
+      }
+    }
+
     // Nothing to update?
-    if (Object.keys(updates).length === 0) {
+    if (Object.keys(updates).length === 0 && Object.keys(roleUpdates).length === 0) {
       return res.status(400).json({
         error: 'No updatable fields provided.',
         allowed_fields: ['email', 'full_name', 'phone', 'gender', 'date_of_birth'],
@@ -185,30 +273,61 @@ exports.updateProfile = async (req, res) => {
       });
     }
 
-    // Build dynamic UPDATE
-    const set = [];
-    const params = [];
-    let i = 1;
+    let row;
+    if (Object.keys(updates).length > 0) {
+      // Build dynamic UPDATE
+      const set = [];
+      const params = [];
+      let i = 1;
 
-    for (const [col, val] of Object.entries(updates)) {
-      set.push(`${col} = $${i++}`);
-      params.push(val);
+      for (const [col, val] of Object.entries(updates)) {
+        set.push(`${col} = $${i++}`);
+        params.push(val);
+      }
+      set.push('updated_at = NOW()');
+      params.push(userId);
+
+      const sql = `
+        UPDATE users
+           SET ${set.join(', ')}
+         WHERE id = $${i}
+         RETURNING id, full_name, email, phone, gender, date_of_birth, profile_picture_url, role, created_at, updated_at
+      `;
+
+      const { rows } = await pool.query(sql, params);
+      if (!rows[0]) return res.status(404).json({ error: 'User not found.' });
+      row = rows[0];
+    } else {
+      const { rows } = await pool.query(
+        'SELECT id, full_name, email, phone, gender, date_of_birth, profile_picture_url, role, created_at, updated_at FROM users WHERE id = $1',
+        [userId]
+      );
+      row = rows[0];
     }
-    set.push('updated_at = NOW()');
-    params.push(userId);
 
-    const sql = `
-      UPDATE users
-         SET ${set.join(', ')}
-       WHERE id = $${i}
-       RETURNING id, full_name, email, phone, gender, date_of_birth, role, created_at, updated_at
-    `;
-
-    const { rows } = await pool.query(sql, params);
-    if (!rows[0]) return res.status(404).json({ error: 'User not found.' });
+    if (Object.keys(roleUpdates).length > 0) {
+      const table = role === 'patient' ? 'patients' : 'doctors';
+      const set = [];
+      const params = [];
+      let i = 1;
+      for (const [col, val] of Object.entries(roleUpdates)) {
+        set.push(`${col} = $${i++}`);
+        params.push(val);
+      }
+      params.push(userId);
+      const { rows: roleRows } = await pool.query(
+        `UPDATE ${table} SET ${set.join(', ')} WHERE user_id = $${i} RETURNING *`,
+        params
+      );
+      // Merge in the role-specific fields only — roleRows[0].id is the
+      // patients/doctors row's own PK, not the user's, so it must not clobber row.id.
+      if (roleRows[0]) {
+        const { id, user_id, ...roleFields } = roleRows[0];
+        Object.assign(row, roleFields);
+      }
+    }
 
     // Include phone_number alias in response to keep old clients happy
-    const row = rows[0];
     res.json({
       ...row,
       phone_number: row.phone
@@ -348,7 +467,7 @@ exports.createBillingAddress = async (req, res) => {
     await pool.query('ROLLBACK').catch(() => {});
     const code = err.status || 500;
     console.error('[createBillingAddress] Error:', err);
-    return res.status(code).json({ error: err.message || 'Internal server error' });
+    return res.status(code).json({ error: err.status ? err.message : 'Something went wrong. Please try again.' });
   } finally {
     client.release();
   }
@@ -421,7 +540,7 @@ exports.updateBillingAddress = async (req, res) => {
     await pool.query('ROLLBACK').catch(() => {});
     const code = err.status || 500;
     console.error('[updateBillingAddress] Error:', err);
-    return res.status(code).json({ error: err.message || 'Internal server error' });
+    return res.status(code).json({ error: err.status ? err.message : 'Something went wrong. Please try again.' });
   } finally {
     client.release();
   }
@@ -448,7 +567,7 @@ exports.updatePaymentMethod = async (req, res) => {
       return res.status(400).json({ error: 'Storing raw card numbers or CVC is not allowed.' });
     }
 
-    const allowedProviders = ['paypal', 'card', 'cod'];
+    const allowedProviders = ['card', 'fpx'];
     const allowedStatus = ['active', 'inactive'];
     const updates = {};
     const body = req.body || {};
@@ -491,18 +610,6 @@ exports.updatePaymentMethod = async (req, res) => {
       updates.exp_year = Number.isFinite(y) ? y : null;
     }
 
-    // paypal fields
-    if (body.paypal_payer_id !== undefined) {
-      const v = String(body.paypal_payer_id).trim();
-      updates.paypal_payer_id = v || null;
-    }
-    if (body.paypal_email !== undefined) {
-      const v = String(body.paypal_email).trim().toLowerCase();
-      const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (v && !emailRe.test(v)) return res.status(400).json({ error: 'paypal_email is invalid.' });
-      updates.paypal_email = v || null;
-    }
-
     // status
     if (body.status !== undefined) {
       const s = String(body.status).toLowerCase();
@@ -524,27 +631,14 @@ exports.updatePaymentMethod = async (req, res) => {
       updates.is_default = makeDefault;
     }
 
-    // If provider is explicitly changing, null out fields that don't apply
+    // If switching to fpx, the card metadata fields no longer apply
     const effectiveProvider = updates.provider || existing.provider;
-    if (updates.provider !== undefined) {
-      if (effectiveProvider === 'paypal') {
-        updates.cardholder_name ??= null;
-        updates.brand ??= null;
-        updates.last4 ??= null;
-        updates.exp_month ??= null;
-        updates.exp_year ??= null;
-      } else if (effectiveProvider === 'card') {
-        updates.paypal_payer_id ??= null;
-        updates.paypal_email ??= null;
-      } else if (effectiveProvider === 'cod') {
-        updates.cardholder_name ??= null;
-        updates.brand ??= null;
-        updates.last4 ??= null;
-        updates.exp_month ??= null;
-        updates.exp_year ??= null;
-        updates.paypal_payer_id ??= null;
-        updates.paypal_email ??= null;
-      }
+    if (updates.provider !== undefined && effectiveProvider === 'fpx') {
+      updates.cardholder_name ??= null;
+      updates.brand ??= null;
+      updates.last4 ??= null;
+      updates.exp_month ??= null;
+      updates.exp_year ??= null;
     }
 
     if (Object.keys(updates).length === 0 && makeDefault === null) {

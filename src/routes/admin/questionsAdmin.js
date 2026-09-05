@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../../config/db');
+const paginate = require('../../utils/pagination');
 const verifyToken = require('../../middleware/verifyToken');
 
 // Middleware to ensure only admin
@@ -32,8 +33,13 @@ const isAdmin = (req, res, next) => {
  */
 router.get('/', verifyToken, isAdmin, async (req, res) => {
   try {
-    const result = await db.query('SELECT * FROM question_bank ORDER BY created_at DESC');
-    res.status(200).json(result.rows);
+    const result = await paginate({
+      table: 'question_bank',
+      page: parseInt(req.query.page) || 1,
+      limit: parseInt(req.query.limit) || 10,
+      sort: req.query.sort || '-created_at',
+    });
+    res.status(200).json(result);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch questions' });
   }

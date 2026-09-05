@@ -26,15 +26,23 @@ exports.getAllDoctorSubscriptions = async (req, res) => {
     const filters = {};
     for (const key in req.query) {
       if (validColumns.includes(key) && key !== 'page' && key !== 'limit' && key !== 'sort') {
-        filters[key] = req.query[key];
+        filters[`ds.${key}`] = req.query[key];
       }
     }
 
     const result = await paginate({
-      table: 'doctor_subscriptions',
+      table: 'doctor_subscriptions ds',
       page,
       limit,
       sort,
+      sortTable: 'ds',
+      select: `
+        ds.*, u.full_name AS doctor_name, dp.name AS plan_name
+      `,
+      join: `
+        LEFT JOIN users u ON ds.user_id = u.id
+        LEFT JOIN doctor_plans dp ON ds.plan_id = dp.id
+      `,
       filters
     });
 

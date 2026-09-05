@@ -3,6 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const insuranceRequestsController = require('../../controllers/insurance/insuranceRequestsController');
+const patientInsuranceController = require('../../controllers/insurance/patientInsuranceController');
 const verifyToken = require('../../middleware/verifyToken');
 const requireRole = require('../../middleware/requireRole');
 /**
@@ -72,6 +73,11 @@ const requireRole = require('../../middleware/requireRole');
  *       400:
  *         description: Missing required fields
  */
+// Patient: manage persistent active insurance policy (static routes before /:id)
+router.get('/policy', verifyToken, requireRole('patient'), patientInsuranceController.getMyPolicy);
+router.post('/policy', verifyToken, requireRole('patient'), patientInsuranceController.saveMyPolicy);
+router.delete('/policy', verifyToken, requireRole('patient'), patientInsuranceController.cancelMyPolicy);
+
 // Patient: Submit new request
 router.post('/', verifyToken, requireRole('patient'), insuranceRequestsController.submitInsuranceRequest);
 
@@ -123,62 +129,13 @@ router.get('/doctor/:id', verifyToken, insuranceRequestsController.getDoctorInsu
  *       404:
  *         description: Insurance request not found
  */
-// Doctor: Accept
-router.post('/:id/accept', verifyToken, insuranceRequestsController.acceptInsuranceRequest);
-/**
- * @swagger
- * /insurance/insurance-requests/{id}/reject:
- *   post:
- *     summary: Reject an insurance request (Doctor)
- *     tags:
- *       - Insurance - Requests
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: Insurance Request ID
- *     responses:
- *       200:
- *         description: Insurance request rejected
- *       400:
- *         description: Invalid request or already processed
- *       404:
- *         description: Insurance request not found
- */
-// Doctor: Reject
-router.post('/:id/reject', verifyToken, insuranceRequestsController.rejectInsuranceRequest);
-/**
- * @swagger
- * /insurance/insurance-requests/patient/{id}:
- *   get:
- *     summary: Get all insurance requests submitted by a patient
- *     tags:
- *       - Insurance - Requests
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: Patient ID
- *     responses:
- *       200:
- *         description: List of insurance requests for the patient
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/InsuranceRequest'
- */
-// Patient: View own requests
-router.get('/patient/:id', verifyToken, insuranceRequestsController.getPatientInsuranceRequests);
+// Doctor or Admin: Accept
+router.post('/:id/accept', verifyToken, requireRole(['doctor', 'admin']), insuranceRequestsController.acceptInsuranceRequest);
+// Doctor or Admin: Reject
+router.post('/:id/reject', verifyToken, requireRole(['doctor', 'admin']), insuranceRequestsController.rejectInsuranceRequest);
+// A patient views their own requests via GET /my above — the old
+// GET /patient/:id (unused by the frontend, and unauthenticated against
+// which patient it was reading) has been removed.
 /**
  * @swagger
  * /insurance/insurance-requests:

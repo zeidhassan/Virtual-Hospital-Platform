@@ -17,7 +17,11 @@ exports.getAllAppointments = async (req, res) => {
       "appointment_start_time",
       "appointment_end_time",
       "status",
-      "notes"
+      "notes",
+      "appointment_type",
+      "triage_session_id",
+      "reminder_sent",
+      "created_by"
     ];
 
     const filters = {};
@@ -73,15 +77,19 @@ exports.createAppointment = async (req, res) => {
     appointment_start_time,
     appointment_end_time,
     status,
-    notes
+    notes,
+    appointment_type,
+    triage_session_id,
+    reminder_sent,
+    created_by
   } = req.body;
 
   try {
     const result = await pool.query(
-      `INSERT INTO appointments 
-        (patient_id, doctor_id, appointment_date, appointment_start_time, appointment_end_time, status, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [patient_id, doctor_id, appointment_date, appointment_start_time, appointment_end_time, status, notes]
+      `INSERT INTO appointments
+        (patient_id, doctor_id, appointment_date, appointment_start_time, appointment_end_time, status, notes, appointment_type, triage_session_id, reminder_sent, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      [patient_id, doctor_id, appointment_date, appointment_start_time, appointment_end_time, status, notes, appointment_type, triage_session_id, reminder_sent, created_by]
     );
 
     res.status(201).json(result.rows[0]);
@@ -103,16 +111,21 @@ exports.updateAppointment = async (req, res) => {
     appointment_start_time,
     appointment_end_time,
     status,
-    notes
+    notes,
+    appointment_type,
+    triage_session_id,
+    reminder_sent,
+    created_by
   } = req.body;
 
   try {
     const result = await pool.query(
-      `UPDATE appointments 
+      `UPDATE appointments
        SET patient_id=$1, doctor_id=$2, appointment_date=$3, appointment_start_time=$4,
-           appointment_end_time=$5, status=$6, notes=$7
-       WHERE id=$8 RETURNING *`,
-      [patient_id, doctor_id, appointment_date, appointment_start_time, appointment_end_time, status, notes, req.params.id]
+           appointment_end_time=$5, status=$6, notes=$7, appointment_type=$8,
+           triage_session_id=$9, reminder_sent=$10, created_by=$11
+       WHERE id=$12 RETURNING *`,
+      [patient_id, doctor_id, appointment_date, appointment_start_time, appointment_end_time, status, notes, appointment_type, triage_session_id, reminder_sent, created_by, req.params.id]
     );
 
     if (result.rows.length === 0) {

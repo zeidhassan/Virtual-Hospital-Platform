@@ -1,7 +1,7 @@
 import apiClient from './client';
 
 export const getFpxBanks = () => apiClient.get('/payments/fpx-banks');
-export const getMyBills = () => apiClient.get('/payments/bills/my');
+export const getMyBills = (params = {}) => apiClient.get('/payments/bills/my', { params });
 export const payBill = (data) => apiClient.post('/payments/pay', data);
 export const getMyTransactions = () => apiClient.get('/payments/transactions');
 

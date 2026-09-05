@@ -1,54 +1,91 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
+  darkMode: ['class', '[data-theme="dark"]'],
   theme: {
     extend: {
       colors: {
         brand: {
-          50:  '#f0fdfa',
-          100: '#ccfbf1',
-          200: '#99f6e4',
-          300: '#5eead4',
-          400: '#2dd4bf',
-          500: '#14b8a6',
-          600: '#0d9488',
-          700: '#0f766e',
-          800: '#115e59',
-          900: '#134e4a',
-          950: '#042f2e',
+          50:  '#F0EEFF',
+          100: '#DDD6FE',
+          200: '#C4B8FC',
+          300: '#A78BFA',
+          400: '#9270F7',
+          500: '#7C6EF8',
+          600: '#6B5CF0',
+          700: '#5B4AE0',
+          800: '#4C3BB8',
+          900: '#3D2D95',
         },
+        // surface/text read from CSS custom properties (defined in index.css for
+        // :root and .dark) so light/dark values are swapped natively by the
+        // cascade — no per-class `dark:` variant needed anywhere they're used.
         surface: {
-          DEFAULT: '#ffffff',
-          muted: '#f8fafc',
-          subtle: '#f1f5f9',
+          DEFAULT: 'var(--surface)',
+          muted:   'var(--surface-muted)',
+          subtle:  'var(--surface-subtle)',
+          warm:    'var(--surface-warm)',
+          dark: {
+            DEFAULT: '#1E1E1E',
+            muted:   '#2A2A2A',
+            subtle:  '#333333',
+            warm:    '#3A3A3A',
+          },
         },
         text: {
-          primary: '#0f172a',
-          secondary: '#64748b',
-          muted: '#94a3b8',
-          inverse: '#ffffff',
+          primary:   'var(--text-primary)',
+          secondary: 'var(--text-secondary)',
+          muted:     'var(--text-muted)',
+          inverse:   'var(--text-inverse)',
+          dark: {
+            primary:   '#F5F5F5',
+            secondary: '#D4D4D4',
+            muted:     '#A3A3A3',
+            inverse:   '#1C1917',
+          },
+        },
+        status: {
+          success: '#16A34A',
+          'success-light': '#DCFCE7',
+          warning: '#D97706',
+          'warning-light': '#FEF3C7',
+          error: '#DC2626',
+          'error-light': '#FEE2E2',
+          info: '#2563EB',
+          'info-light': '#DBEAFE',
         },
       },
       fontFamily: {
         sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
       },
       borderRadius: {
-        card: '0.875rem',
+        card: '0.875rem', // 14px
+        'btn-sm': '0.5rem',   // 8px
+        'btn-md': '0.625rem', // 10px
+        'btn-lg': '0.75rem',  // 12px
       },
       boxShadow: {
-        card: '0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04)',
-        'card-hover': '0 4px 6px -1px rgb(0 0 0 / 0.06), 0 2px 4px -2px rgb(0 0 0 / 0.06)',
-        modal: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+        card:       '0 1px 4px rgba(28,25,23,.06), 0 1px 2px rgba(28,25,23,.04)',
+        'card-hover':'0 4px 14px rgba(28,25,23,.08), 0 2px 4px rgba(28,25,23,.04)',
+        modal:      '0 20px 40px rgba(28,25,23,.12), 0 8px 16px rgba(28,25,23,.06)',
       },
       animation: {
         'fade-in': 'fadeIn 0.2s ease-out',
+        'fade-up': 'fadeUp 0.3s ease forwards',
         'slide-up': 'slideUp 0.3s ease-out',
         'slide-in-right': 'slideInRight 0.3s ease-out',
+        'float': 'float 7s ease-in-out infinite',
+        'pulse-slow': 'pulse 1.5s ease infinite',
+        'spin': 'spin 0.7s linear infinite',
       },
       keyframes: {
         fadeIn: {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' },
+        },
+        fadeUp: {
+          '0%': { opacity: '0', transform: 'translateY(10px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         slideUp: {
           '0%': { opacity: '0', transform: 'translateY(10px)' },
@@ -57,6 +94,17 @@ export default {
         slideInRight: {
           '0%': { opacity: '0', transform: 'translateX(10px)' },
           '100%': { opacity: '1', transform: 'translateX(0)' },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-8px)' },
+        },
+        pulse: {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.4' },
+        },
+        spin: {
+          'to': { transform: 'rotate(360deg)' },
         },
       },
     },

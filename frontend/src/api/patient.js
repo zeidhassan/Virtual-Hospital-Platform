@@ -2,13 +2,17 @@ import apiClient from './client';
 
 // Questions
 export const getQuestions = (params = {}) =>
-  apiClient.get('/question-bank', { params });
+  apiClient.get('/questions/public', { params });
 
 export const submitAnswers = (data) =>
-  apiClient.post('/patient-question-responses', data);
+  apiClient.post('/questions/submit-answers', data);
 
 export const getMyAnswers = (params = {}) =>
-  apiClient.get('/patient-question-responses/my', { params });
+  apiClient.get('/questions/my-responses', { params });
+
+// Doctor-assigned questions
+export const getMyQuestionAssignments = () =>
+  apiClient.get('/question-assignments/my');
 
 // Notifications
 export const getNotifications = (params = {}) =>

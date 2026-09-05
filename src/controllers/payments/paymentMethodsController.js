@@ -10,7 +10,8 @@ exports.listMethods = async (req, res) => {
     );
     res.json({ data: result.rows });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };
 
@@ -36,7 +37,8 @@ exports.saveMethod = async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };
 
@@ -51,7 +53,8 @@ exports.setDefault = async (req, res) => {
     const result = await pool.query('UPDATE payment_methods SET is_default = true WHERE id = $1 RETURNING *', [id]);
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };
 
@@ -65,6 +68,7 @@ exports.deleteMethod = async (req, res) => {
     await pool.query("UPDATE payment_methods SET status = 'inactive' WHERE id = $1", [id]);
     res.json({ message: 'Payment method removed' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };

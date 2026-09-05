@@ -5,11 +5,12 @@ const { encrypt, decrypt } = require('../../utils/encrypt');
 // Get patients assigned to the doctor
 exports.getDoctorPatients = async (req, res) => {
   const userId = req.user.id;
-  const doctorResult = await pool.query('SELECT id FROM doctors WHERE user_id = $1', [userId]);
-  if (doctorResult.rows.length === 0) return res.status(404).json({ error: 'Doctor not found.' });
-  const doctorId = doctorResult.rows[0].id;
 
   try {
+    const doctorResult = await pool.query('SELECT id FROM doctors WHERE user_id = $1', [userId]);
+    if (doctorResult.rows.length === 0) return res.status(404).json({ error: 'Doctor not found.' });
+    const doctorId = doctorResult.rows[0].id;
+
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
 
@@ -34,11 +35,11 @@ exports.getDoctorPatients = async (req, res) => {
       page,
       sort: 'id',
       limit,
-      sortTable: 'u',
-      select: 'DISTINCT ON (u.id) u.id, u.full_name, u.email, patients.blood_group, patients.allergies, patients.chronic_conditions',
+      sortTable: 'patients',
+      select: 'DISTINCT ON (patients.id) patients.id, u.full_name, u.email, patients.blood_group, patients.allergies, patients.chronic_conditions',
       join: `
         JOIN users u ON patients.user_id = u.id
-        JOIN appointments a ON a.patient_id = patients.id 
+        JOIN appointments a ON a.patient_id = patients.id
       `,
       filters: {
         'a.doctor_id': doctorId,
@@ -178,11 +179,13 @@ exports.getAppointmentStats = async (req, res) => {
 };
 
 // Get medical records for patients assigned to the doctor
+// Every record for every patient this doctor is linked to (via any appointment),
+// not just records this doctor personally created — 'private' only gates the
+// patient's own view of a record, so it doesn't restrict doctor-to-doctor visibility.
 exports.getMedicalRecords = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Get doctor_id from user_id
     const doctorResult = await pool.query(
       'SELECT id FROM doctors WHERE user_id = $1',
       [userId]
@@ -194,63 +197,125 @@ exports.getMedicalRecords = async (req, res) => {
 
     const doctorId = doctorResult.rows[0].id;
 
-    // Pagination + Filters
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const sort = req.query.sort || '-created_at';
+    const offset = (page - 1) * limit;
 
-    const validColumns = [
-      'appointment_id',
-      'record_type',
-      'private',
+    const conditions = [
+      `mr.patient_id IN (SELECT DISTINCT patient_id FROM appointments WHERE doctor_id = $1)`,
     ];
+    const params = [doctorId];
 
-    const filters = {};
-    for (const key in req.query) {
-      if (validColumns.includes(key) && key !== 'page' && key !== 'limit' && key !== 'sort') {
-        filters[key] = req.query[key];
-      }
+    if (req.query.patient_id) {
+      params.push(req.query.patient_id);
+      conditions.push(`mr.patient_id = $${params.length}`);
+    }
+    if (req.query.record_type) {
+      params.push(req.query.record_type);
+      conditions.push(`mr.record_type = $${params.length}`);
+    }
+    if (req.query.name) {
+      params.push(`%${req.query.name.toLowerCase()}%`);
+      conditions.push(`LOWER(u.full_name) LIKE $${params.length}`);
     }
 
-    const result = await paginate({
-      table: 'medical_records mr',
-      page,
-      limit,
-      sort,
-      sortTable: 'mr',
-      select: `
-        mr.id, mr.record_type, mr.description, mr.file_url, mr.created_at, mr.private,
-        u.full_name AS patient_name
-      `,
-      join: `
-        JOIN patients p ON mr.patient_id = p.id
-        JOIN users u ON p.user_id = u.id
-      `,
-      filters: {
-        'mr.doctor_id': doctorId,
-        'u.full_name': req.query.name || undefined,
-        ...filters
-      }
+    const where = `WHERE ${conditions.join(' AND ')}`;
+
+    const countRes = await pool.query(
+      `SELECT COUNT(*) FROM medical_records mr
+       JOIN patients p ON mr.patient_id = p.id
+       JOIN users u ON p.user_id = u.id
+       ${where}`,
+      params
+    );
+    const total = parseInt(countRes.rows[0].count);
+
+    const dataRes = await pool.query(
+      `SELECT mr.id, mr.record_type, mr.description, mr.file_url, mr.created_at, mr.private,
+              mr.patient_id, mr.doctor_id, u.full_name AS patient_name, du.full_name AS created_by_name
+       FROM medical_records mr
+       JOIN patients p ON mr.patient_id = p.id
+       JOIN users u ON p.user_id = u.id
+       LEFT JOIN doctors d ON mr.doctor_id = d.id
+       LEFT JOIN users du ON d.user_id = du.id
+       ${where}
+       ORDER BY mr.created_at DESC
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, offset]
+    );
+
+    const data = dataRes.rows.map(r => ({ ...r, description: decrypt(r.description) }));
+
+    res.json({
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      pageSize: limit,
+      totalItems: total,
+      data,
     });
-
-    if (Array.isArray(result?.data)) {
-      result.data = result.data.map(r => ({
-        ...r,
-        description: decrypt(r.description)
-      }));
-    }
-
-    res.json(result);
   } catch (err) {
     console.error('[ERROR] getMedicalRecords:', err);
     res.status(500).json({ error: 'Failed to fetch medical records.' });
   }
 };
 
-// Update a medical record by doctor
+// Doctor uploads a medical record directly for a linked patient — not tied to
+// any specific appointment (appointment_id is optional, for when they do want
+// to reference a particular visit).
+exports.addPatientRecord = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { patientId } = req.params;
+    const { record_type, description, appointment_id, private: isPrivate } = req.body;
+
+    const doctorResult = await pool.query('SELECT id FROM doctors WHERE user_id = $1', [userId]);
+    if (doctorResult.rowCount === 0) return res.status(404).json({ error: 'Doctor not found.' });
+    const doctorId = doctorResult.rows[0].id;
+
+    const linkCheck = await pool.query(
+      'SELECT 1 FROM appointments WHERE doctor_id = $1 AND patient_id = $2 LIMIT 1',
+      [doctorId, patientId]
+    );
+    if (linkCheck.rowCount === 0) {
+      return res.status(403).json({ error: 'You are not linked to this patient.' });
+    }
+
+    if (!record_type) {
+      return res.status(400).json({ error: 'record_type is required.' });
+    }
+
+    let linkedAppointmentId = null;
+    if (appointment_id) {
+      const apptCheck = await pool.query(
+        'SELECT id FROM appointments WHERE id = $1 AND doctor_id = $2 AND patient_id = $3',
+        [appointment_id, doctorId, patientId]
+      );
+      if (apptCheck.rowCount === 0) {
+        return res.status(400).json({ error: 'That appointment does not belong to this doctor/patient pair.' });
+      }
+      linkedAppointmentId = appointment_id;
+    }
+
+    const filePath = req.file ? `uploads/medical-records/${req.file.filename}` : null;
+    const encryptedDescription = encrypt(description || '');
+
+    const result = await pool.query(
+      `INSERT INTO medical_records (patient_id, doctor_id, appointment_id, record_type, description, file_url, created_at, private)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7) RETURNING *`,
+      [patientId, doctorId, linkedAppointmentId, record_type, encryptedDescription, filePath, isPrivate === 'true' || isPrivate === true]
+    );
+
+    res.status(201).json({ message: 'Medical record added', data: result.rows[0] });
+  } catch (err) {
+    console.error('[ERROR] addPatientRecord:', err);
+    res.status(500).json({ error: 'Failed to add medical record.' });
+  }
+};
+
+// Update a medical record by doctor — only the doctor who created it may edit it.
 exports.updateMedicalRecord = async (req, res) => {
   const { id } = req.params;
-  const { records_type, description, private: isPrivate } = req.body;
+  const { record_type, description, private: isPrivate } = req.body;
   try {
     const userId = req.user.id;
 
@@ -270,10 +335,10 @@ exports.updateMedicalRecord = async (req, res) => {
 
     const result = await pool.query(
       `UPDATE medical_records
-       SET record_type = $1, description = $2, create_at = NOW(), private =$3
+       SET record_type = $1, description = $2, private = $3
        WHERE id = $4 AND doctor_id = $5
        RETURNING *`,
-      [records_type, encryptedDescription, isPrivate, id, doctorId]
+      [record_type, encryptedDescription, isPrivate, id, doctorId]
     );
 
     if (result.rows.length === 0) {
@@ -287,10 +352,12 @@ exports.updateMedicalRecord = async (req, res) => {
   }
 };
 
-// Update a prescription by doctor
+// Update a prescription by doctor — ownership resolved through the
+// prescription's own appointment, since prescriptions has no patient_id
+// column (only appointment_id).
 exports.updatePrescription = async (req, res) => {
   const { id } = req.params;
-  const { medication, dosage, pack_limit, instructions, limit_reached } = req.body;
+  const { medication_id, dosage, pack_limit, instructions, limit_reached } = req.body;
   try {
     const userId = req.user.id;
 
@@ -306,13 +373,10 @@ exports.updatePrescription = async (req, res) => {
 
     const doctorId = doctorResult.rows[0].id;
 
-    const encryptedInstructions = encrypt(instructions);
-
-    // Ensure the prescription is assigned to a patient of this doctor
+    // Ensure this prescription belongs to one of this doctor's own appointments
     const check = await pool.query(
       `SELECT pr.* FROM prescriptions pr
-       JOIN patients p ON pr.patient_id = p.id
-       JOIN appointments a ON a.patient_id = p.id
+       JOIN appointments a ON pr.appointment_id = a.id
        WHERE pr.id = $1 AND a.doctor_id = $2`,
       [id, doctorId]
     );
@@ -321,11 +385,20 @@ exports.updatePrescription = async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized or prescription not found.' });
     }
 
+    if (medication_id) {
+      const medRes = await pool.query('SELECT id FROM medications WHERE id = $1', [medication_id]);
+      if (medRes.rows.length === 0) {
+        return res.status(404).json({ error: 'Medication not found.' });
+      }
+    }
+
+    const encryptedInstructions = encrypt(instructions);
+
     const result = await pool.query(
       `UPDATE prescriptions
-       SET medication = $1, dosage = $2, pack_limit = $3, instructions = $4, issued_date = NOW(), limit_reached = $5
+       SET medication_id = COALESCE($1, medication_id), dosage = $2, pack_limit = $3, instructions = $4, issued_date = NOW(), limit_reached = $5
        WHERE id = $6 RETURNING *`,
-      [medication, dosage, pack_limit, encryptedInstructions, limit_reached, id]
+      [medication_id || null, dosage, pack_limit, encryptedInstructions, limit_reached, id]
     );
 
     res.json(result.rows[0]);
@@ -358,9 +431,9 @@ exports.getPrescriptions = async (req, res) => {
 
     const validColumns = [
       "appointment_id",
-      "medication",
+      "medication_id",
       "issued_date",
-      "limited_reached",
+      "limit_reached",
     ];
 
     const filters = {};
@@ -378,14 +451,15 @@ exports.getPrescriptions = async (req, res) => {
       sort,
       sortTable: 'p',
       select: `
-        p.id, p.appointment_id, p.medication, p.dosage, p.instructions,
-        p.pack_limit, p.limit_reached, p.issued_date,
+        p.id, p.appointment_id, m.name AS medication, p.medication_id, p.dosage, p.instructions,
+        p.pack_limit, p.refills_used, p.limit_reached, p.issued_date,
         u.full_name AS patient_name
       `,
       join: `
         JOIN appointments a ON p.appointment_id = a.id
         JOIN patients pt ON a.patient_id = pt.id
         JOIN users u ON pt.user_id = u.id
+        JOIN medications m ON p.medication_id = m.id
       `,
       filters: {
         'a.doctor_id': doctorId,

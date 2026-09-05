@@ -79,16 +79,16 @@ async function getTicketById(ticketId) {
   return rows[0] || null;
 }
 // Best-effort notifications (ignored if table/columns differ)
-async function notifyUsers(userIds, title, message, type = 'support') {
+async function notifyUsers(userIds, title, message, category = 'support') {
   if (!userIds?.length) return;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     for (const uid of userIds.filter(Boolean)) {
       await client.query(
-        `INSERT INTO notifications (user_id, title, message, type, created_at)
+        `INSERT INTO notifications (user_id, title, body, category, created_at)
          VALUES ($1, $2, $3, $4, NOW())`,
-        [uid, title, message, type]
+        [uid, title, message, category]
       );
     }
     await client.query('COMMIT');
@@ -134,7 +134,7 @@ exports.getAllDoctorTickets = async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('[getAllDoctorTickets] Error:', err);
-    res.status(err.code || 500).json({ error: err.message || 'Internal server error' });
+    res.status(err.code || 500).json({ error: err.code ? err.message : 'Something went wrong. Please try again.' });
   }
 };
 
@@ -172,7 +172,7 @@ exports.getAllPatientTickets = async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('[getAllPatientTickets] Error:', err);
-    res.status(err.code || 500).json({ error: err.message || 'Internal server error' });
+    res.status(err.code || 500).json({ error: err.code ? err.message : 'Something went wrong. Please try again.' });
   }
 };
 
@@ -196,10 +196,23 @@ exports.getAllAdminTickets = async (req, res) => {
       limit: req.query.limit || 20,
       sort: normalizeSort(req.query.sort),
       select: `
-        st.*, 
+        st.*,
         u.full_name AS creator_name,
         d_user.full_name AS doctor_name,
-        p_user.full_name AS patient_name
+        p_user.full_name AS patient_name,
+        (
+          EXISTS (
+            SELECT 1 FROM support_ticket_replies r
+            LEFT JOIN users ru ON ru.id = r.user_id
+            WHERE r.ticket_id = st.id
+              AND (ru.role IS DISTINCT FROM 'admin')
+              AND r.created_at > COALESCE(st.admin_read_at, '-infinity'::timestamp)
+          )
+          OR (
+            st.admin_read_at IS NULL
+            AND NOT EXISTS (SELECT 1 FROM support_ticket_replies WHERE ticket_id = st.id)
+          )
+        ) AS has_unread
       `,
       join: `
         LEFT JOIN users u ON u.id = st.user_id
@@ -214,7 +227,7 @@ exports.getAllAdminTickets = async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('[getAllAdminTickets] Error:', err);
-    res.status(err.code || 500).json({ error: err.message || 'Internal server error' });
+    res.status(err.code || 500).json({ error: err.code ? err.message : 'Something went wrong. Please try again.' });
   }
 };
 
@@ -271,7 +284,7 @@ exports.patientCreateTicket = async (req, res) => {
     res.status(201).json(ticket);
   } catch (err) {
     console.error('[patientCreateTicket] Error:', err);
-    res.status(err.code || 500).json({ error: err.message || 'Internal server error' });
+    res.status(err.code || 500).json({ error: err.code ? err.message : 'Something went wrong. Please try again.' });
   }
 };
 
@@ -295,7 +308,7 @@ exports.doctorCreateTicket = async (req, res) => {
     res.status(201).json(ticket);
   } catch (err) {
     console.error('[doctorCreateTicket] Error:', err);
-    res.status(err.code || 500).json({ error: err.message || 'Internal server error' });
+    res.status(err.code || 500).json({ error: err.code ? err.message : 'Something went wrong. Please try again.' });
   }
 };
 
@@ -314,7 +327,7 @@ exports.adminCreateTicket = async (req, res) => {
     res.status(201).json(ticket);
   } catch (err) {
     console.error('[adminCreateTicket] Error:', err);
-    res.status(err.code || 500).json({ error: err.message || 'Internal server error' });
+    res.status(err.code || 500).json({ error: err.code ? err.message : 'Something went wrong. Please try again.' });
   }
 };
 
@@ -351,7 +364,7 @@ exports.adminAssign = async (req, res) => {
     res.json(rows[0]);
   } catch (err) {
     console.error('[adminAssign] Error:', err);
-    res.status(err.code || 500).json({ error: err.message || 'Internal server error' });
+    res.status(err.code || 500).json({ error: err.code ? err.message : 'Something went wrong. Please try again.' });
   }
 };
 
@@ -410,7 +423,7 @@ exports.patientReply = async (req, res) => {
     res.status(201).json(reply);
   } catch (err) {
     console.error('[patientReply] Error:', err);
-    res.status(err.code || 500).json({ error: err.message || 'Internal server error' });
+    res.status(err.code || 500).json({ error: err.code ? err.message : 'Something went wrong. Please try again.' });
   }
 };
 
@@ -435,7 +448,7 @@ exports.doctorReply = async (req, res) => {
     res.status(201).json(reply);
   } catch (err) {
     console.error('[doctorReply] Error:', err);
-    res.status(err.code || 500).json({ error: err.message || 'Internal server error' });
+    res.status(err.code || 500).json({ error: err.code ? err.message : 'Something went wrong. Please try again.' });
   }
 };
 
@@ -459,7 +472,7 @@ exports.adminReply = async (req, res) => {
     res.status(201).json(reply);
   } catch (err) {
     console.error('[adminReply] Error:', err);
-    res.status(err.code || 500).json({ error: err.message || 'Internal server error' });
+    res.status(err.code || 500).json({ error: err.code ? err.message : 'Something went wrong. Please try again.' });
   }
 };
 
@@ -507,7 +520,7 @@ exports.updateTicketStatus = async (req, res) => {
     res.json(rows[0]);
   } catch (err) {
     console.error('[updateTicketStatus] Error:', err);
-    res.status(err.code || 500).json({ error: err.message || 'Internal server error' });
+    res.status(err.code || 500).json({ error: err.code ? err.message : 'Something went wrong. Please try again.' });
   }
 };
 
@@ -533,6 +546,11 @@ exports.getTicketReplies = async (req, res) => {
     }
 
     if (!allowed) return res.status(403).json({ error: 'Not allowed to view replies for this ticket.' });
+
+    // Admin viewing the thread marks it read — the list's "unread" badge clears from here.
+    if (isAdmin) {
+      await pool.query('UPDATE support_tickets SET admin_read_at = NOW() WHERE id = $1', [ticketId]);
+    }
 
     // 2) Pagination + ordering
     const page  = Math.max(1, toInt(req.query.page, 1));

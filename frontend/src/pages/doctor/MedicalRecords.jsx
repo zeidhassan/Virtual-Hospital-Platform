@@ -1,55 +1,61 @@
-import { getDoctorRecords as getMedicalRecords } from '@/api/doctor';
-import useFetch from '@/hooks/useFetch';
-import Card, { CardHeader } from '@/components/ui/Card';
+import { useState, useEffect } from 'react';
+import { getDoctorRecords as getMedicalRecords, addPatientRecord, getDoctorPatients } from '@/api/doctor';
+import { getDoctorAppointments } from '@/api/appointments';
+import usePaginatedFetch from '@/hooks/usePaginatedFetch';
+import Card from '@/components/ui/Card';
 import Spinner from '@/components/ui/Spinner';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
-import { FileText, ExternalLink, FlaskConical, Heart, Scan, Syringe,
-         ClipboardList, FileCheck, Download } from 'lucide-react';
+import PageHeader from '@/components/ui/PageHeader';
+import Pagination from '@/components/ui/Pagination';
+import Modal from '@/components/ui/Modal';
+import Button from '@/components/ui/Button';
+import Select from '@/components/ui/Select';
+import SearchableSelect from '@/components/ui/SearchableSelect';
+import { FileText, ExternalLink, FlaskConical, Heart, Scan, Syringe, ClipboardList, FileCheck, Download, Plus } from 'lucide-react';
 import { format } from 'date-fns';
+import toast from 'react-hot-toast';
 
 const TYPE_META = {
-  'medical-history':  { icon: ClipboardList, bg: 'bg-blue-100',    text: 'text-blue-600',    label: 'Medical History' },
-  'patient-profile':  { icon: FileCheck,     bg: 'bg-slate-100',   text: 'text-slate-600',   label: 'Patient Profile' },
-  'doctor-notes':     { icon: ClipboardList, bg: 'bg-purple-100',  text: 'text-purple-600',  label: 'Doctor Notes' },
-  'diagnosis':        { icon: FileText,      bg: 'bg-red-100',     text: 'text-red-600',     label: 'Diagnosis' },
-  'scan':             { icon: Scan,          bg: 'bg-cyan-100',    text: 'text-cyan-600',    label: 'Scan' },
-  'lab-result':       { icon: FlaskConical,  bg: 'bg-amber-100',   text: 'text-amber-600',   label: 'Lab Result' },
-  'xray':             { icon: Scan,          bg: 'bg-indigo-100',  text: 'text-indigo-600',  label: 'X-Ray' },
-  'blood-test':       { icon: FlaskConical,  bg: 'bg-rose-100',    text: 'text-rose-600',    label: 'Blood Test' },
-  'blood-readings':   { icon: Heart,         bg: 'bg-pink-100',    text: 'text-pink-600',    label: 'Blood Readings' },
-  'radio-reports':    { icon: Scan,          bg: 'bg-violet-100',  text: 'text-violet-600',  label: 'Radio Report' },
-  'health-report':    { icon: FileCheck,     bg: 'bg-green-100',   text: 'text-green-600',   label: 'Health Report' },
-  'vaccination':      { icon: Syringe,       bg: 'bg-teal-100',    text: 'text-teal-600',    label: 'Vaccination' },
-  'referral':         { icon: FileText,      bg: 'bg-orange-100',  text: 'text-orange-600',  label: 'Referral' },
-  'follow-up':        { icon: ClipboardList, bg: 'bg-lime-100',    text: 'text-lime-700',    label: 'Follow-up' },
-  'bill':             { icon: FileText,      bg: 'bg-yellow-100',  text: 'text-yellow-700',  label: 'Bill' },
-  'payment':          { icon: FileCheck,     bg: 'bg-emerald-100', text: 'text-emerald-600', label: 'Payment' },
+  'medical-history': { icon: ClipboardList, bg: 'bg-blue-100', text: 'text-blue-600', label: 'Medical History' },
+  'patient-profile': { icon: FileCheck, bg: 'bg-slate-100', text: 'text-slate-600', label: 'Patient Profile' },
+  'doctor-notes': { icon: ClipboardList, bg: 'bg-purple-100', text: 'text-purple-600', label: 'Doctor Notes' },
+  diagnosis: { icon: FileText, bg: 'bg-red-100', text: 'text-red-600', label: 'Diagnosis' },
+  scan: { icon: Scan, bg: 'bg-cyan-100', text: 'text-cyan-600', label: 'Scan' },
+  'lab-result': { icon: FlaskConical, bg: 'bg-amber-100', text: 'text-amber-600', label: 'Lab Result' },
+  xray: { icon: Scan, bg: 'bg-indigo-100', text: 'text-indigo-600', label: 'X-Ray' },
+  'blood-test': { icon: FlaskConical, bg: 'bg-rose-100', text: 'text-rose-600', label: 'Blood Test' },
+  'blood-readings': { icon: Heart, bg: 'bg-pink-100', text: 'text-pink-600', label: 'Blood Readings' },
+  'radio-reports': { icon: Scan, bg: 'bg-violet-100', text: 'text-violet-600', label: 'Radio Report' },
+  'health-report': { icon: FileCheck, bg: 'bg-green-100', text: 'text-green-600', label: 'Health Report' },
+  vaccination: { icon: Syringe, bg: 'bg-teal-100', text: 'text-teal-600', label: 'Vaccination' },
+  referral: { icon: FileText, bg: 'bg-orange-100', text: 'text-orange-600', label: 'Referral' },
+  'follow-up': { icon: ClipboardList, bg: 'bg-lime-100', text: 'text-lime-700', label: 'Follow-up' },
+  bill: { icon: FileText, bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Bill' },
+  payment: { icon: FileCheck, bg: 'bg-emerald-100', text: 'text-emerald-600', label: 'Payment' },
 };
 
 const DEFAULT_META = { icon: FileText, bg: 'bg-slate-100', text: 'text-slate-600', label: 'Medical Record' };
 
 const downloadRecord = (rec) => {
   const meta = TYPE_META[rec.record_type] || DEFAULT_META;
-  const dateStr = rec.created_at
-    ? format(new Date(rec.created_at), 'dd MMMM yyyy')
-    : 'Unknown date';
+  const dateStr = rec.created_at ? format(new Date(rec.created_at), 'dd MMMM yyyy') : 'Unknown date';
 
   const lines = [
     'HelixaCare — Medical Record',
     '─'.repeat(40),
-    `Record Type   : ${meta.label}`,
-    `Record ID     : #${rec.id}`,
-    `Date          : ${dateStr}`,
-    rec.patient_name  ? `Patient       : ${rec.patient_name}`    : null,
-    rec.appointment_id ? `Appointment   : #${rec.appointment_id}` : null,
+    `Record Type : ${meta.label}`,
+    `Record ID : #${rec.id}`,
+    `Date : ${dateStr}`,
+    rec.patient_name ? `Patient : ${rec.patient_name}` : null,
+    rec.appointment_id
+      ? `Appointment : ${rec.appointment_date ? format(new Date(rec.appointment_date), 'dd MMM yyyy') : `#${rec.appointment_id}`}`
+      : null,
     '─'.repeat(40),
     'Notes / Description:',
     rec.description || '(No notes recorded)',
     '─'.repeat(40),
-    rec.file_url
-      ? `Attached File : ${window.location.origin}/${rec.file_url.replace(/^\//, '')}`
-      : '(No file attachment)',
+    rec.file_url ? `Attached File : ${window.location.origin}/${rec.file_url.replace(/^\//, '')}` : '(No file attachment)',
     '',
     'This document was generated by HelixaCare.',
   ]
@@ -57,90 +63,263 @@ const downloadRecord = (rec) => {
     .join('\n');
 
   const blob = new Blob([lines], { type: 'text/plain' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
   a.download = `helixacare-record-${rec.id}-${rec.record_type}.txt`;
   a.click();
   URL.revokeObjectURL(url);
 };
 
+const RECORD_TYPES = Object.keys(TYPE_META);
+const APPT_TYPE_LABEL = { consultation: 'Consultation', follow_up: 'Follow-up', triage_escalation: 'Escalated' };
+
 const DoctorMedicalRecords = () => {
-  const { data, isLoading, error, refetch } = useFetch(getMedicalRecords);
-  const records = data?.records || data?.data || data || [];
+  const { data: records, isLoading, error, currentPage, totalPages, totalItems, pageSize, setPage, refetch } = usePaginatedFetch(getMedicalRecords);
+  const [detailModal, setDetailModal] = useState(null);
+
+  const [patients, setPatients] = useState([]);
+  const [allAppointments, setAllAppointments] = useState([]);
+  useEffect(() => {
+    getDoctorPatients({ limit: 500 })
+      .then((res) => setPatients(res.data?.data || []))
+      .catch(() => {});
+    getDoctorAppointments({ limit: 500 })
+      .then((res) => setAllAppointments(res.data?.data || []))
+      .catch(() => {});
+  }, []);
+
+  const [addModal, setAddModal] = useState(false);
+  const [form, setForm] = useState({ patient_id: '', appointment_id: '', record_type: 'doctor-notes', description: '', private: false });
+  const [file, setFile] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const patientOptions = patients.map((p) => ({ value: p.id, label: p.full_name || `Patient #${p.id}` }));
+
+  const appointmentOptions = allAppointments
+    .filter((a) => String(a.patient_id) === String(form.patient_id))
+    .map((a) => ({
+      value: a.id,
+      label: `#${a.id} — ${APPT_TYPE_LABEL[a.appointment_type] || 'Appointment'}`,
+      sublabel: [
+        a.appointment_date ? format(new Date(a.appointment_date), 'dd MMM yyyy') : null,
+        a.appointment_start_time ? a.appointment_start_time.slice(0, 5) : null,
+        a.status,
+      ].filter(Boolean).join(' · '),
+    }));
+
+  const openAdd = () => {
+    setForm({ patient_id: '', appointment_id: '', record_type: 'doctor-notes', description: '', private: false });
+    setFile(null);
+    setAddModal(true);
+  };
+
+  const handleAddSave = async () => {
+    if (!form.patient_id || !form.record_type) {
+      toast.error('Select a patient and a record type.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const fd = new FormData();
+      fd.append('record_type', form.record_type);
+      fd.append('description', form.description);
+      fd.append('private', form.private);
+      if (form.appointment_id) fd.append('appointment_id', form.appointment_id);
+      if (file) fd.append('medical_record_file', file);
+      await addPatientRecord(form.patient_id, fd);
+      toast.success('Medical record added');
+      setAddModal(false);
+      refetch();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to add medical record');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <div className="animate-fade-in">
-      <h1 className="page-title mb-6">Medical Records</h1>
+    <div className="animate-fade-in space-y-6">
+      <PageHeader
+        title="Medical Records"
+        action={
+          <Button onClick={openAdd}>
+            <Plus size={16} />
+            Add Record
+          </Button>
+        }
+      />
+
       <Card>
-        <CardHeader title="Patient Medical Records" />
-        {isLoading && <div className="flex justify-center py-12"><Spinner size="lg" /></div>}
-        {error && <ErrorState message={error} onRetry={refetch} />}
-        {!isLoading && !error && records.length === 0 && (
-          <EmptyState
-            icon={FileText}
-            title="No records yet"
-            description="Medical records you've created for patients will appear here."
-          />
+        {isLoading && (
+          <div className="flex justify-center py-12">
+            <Spinner size="lg" />
+          </div>
         )}
+        {error && <ErrorState message={error} onRetry={refetch} />}
+        {!isLoading && !error && records.length === 0 && <EmptyState icon={FileText} title="No records yet" description="Medical records for your patients — created by you, another doctor, or uploaded by the patient — will appear here." />}
         {!isLoading && !error && records.length > 0 && (
           <div className="space-y-3">
             {records.map((rec) => {
               const meta = TYPE_META[rec.record_type] || DEFAULT_META;
               const Icon = meta.icon;
               return (
-                <div key={rec.id} className="p-4 rounded-xl bg-surface-subtle flex gap-4 items-start">
-                  {/* Type icon */}
-                  <div className={`w-9 h-9 rounded-lg ${meta.bg} flex items-center justify-center flex-shrink-0`}>
-                    <Icon size={18} className={meta.text} />
-                  </div>
-
-                  {/* Main content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-medium text-text-primary">{meta.label}</p>
-                      {rec.patient_name && (
-                        <span className="text-xs text-text-muted bg-slate-100 px-2 py-0.5 rounded-full">
-                          {rec.patient_name}
-                        </span>
-                      )}
+                <div key={rec.id} className="p-4 rounded-xl bg-surface-subtle hover:bg-surface-warm transition-colors cursor-pointer border-l-4 border-l-emerald-500" onClick={() => setDetailModal(rec)}>
+                  <div className="flex items-start gap-4">
+                    <div className={`w-[46px] h-[46px] rounded-xl ${meta.bg} flex items-center justify-center flex-shrink-0`}>
+                      <Icon size={22} className={meta.text} />
                     </div>
-                    {rec.description && (
-                      <p className="text-sm text-text-secondary mt-0.5 line-clamp-2">{rec.description}</p>
-                    )}
-                    <p className="text-xs text-text-muted mt-1">
-                      {rec.created_at ? format(new Date(rec.created_at), 'dd MMM yyyy') : '—'}
-                    </p>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-3 flex-shrink-0 mt-0.5">
-                    {rec.file_url && (
-                      <a
-                        href={`/${rec.file_url.replace(/^\//, '')}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium"
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <p className="text-sm font-semibold text-text-primary">{meta.label}</p>
+                        {rec.patient_name && <span className="text-xs text-text-muted bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">{rec.patient_name}</span>}
+                        <span className="text-xs text-text-muted bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                          {rec.created_by_name ? `By ${rec.created_by_name}` : 'Uploaded by patient'}
+                        </span>
+                      </div>
+                      {rec.description && <p className="text-sm text-text-secondary line-clamp-2 mb-2">{rec.description}</p>}
+                      <p className="text-xs text-text-muted">{rec.created_at ? format(new Date(rec.created_at), 'dd MMM yyyy') : '—'}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {rec.file_url && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(`/${rec.file_url.replace(/^\//, '')}`, '_blank');
+                          }}
+                        >
+                          <ExternalLink size={14} />
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          downloadRecord(rec);
+                        }}
                       >
-                        <ExternalLink size={14} />
-                        View
-                      </a>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => downloadRecord(rec)}
-                      className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium"
-                    >
-                      <Download size={14} />
-                      Download
-                    </button>
+                        <Download size={14} />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               );
             })}
           </div>
         )}
+        <Pagination currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} pageSize={pageSize} onPageChange={setPage} />
       </Card>
+
+      {/* Detail Modal */}
+      {detailModal && (
+        <Modal isOpen={!!detailModal} onClose={() => setDetailModal(null)} title={`Medical Record #${detailModal.id}`}>
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">Record Type</p>
+              <p className="text-sm text-text-primary font-medium">{(TYPE_META[detailModal.record_type] || DEFAULT_META).label}</p>
+            </div>
+            {detailModal.patient_name && (
+              <div>
+                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">Patient</p>
+                <p className="text-sm text-text-primary">{detailModal.patient_name}</p>
+              </div>
+            )}
+            {detailModal.appointment_id && (
+              <div>
+                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">Appointment</p>
+                <p className="text-sm text-text-primary">
+                  {detailModal.appointment_date
+                    ? format(new Date(detailModal.appointment_date), 'dd MMM yyyy')
+                    : `#${detailModal.appointment_id}`}
+                  {detailModal.appointment_start_time ? ` · ${detailModal.appointment_start_time.slice(0, 5)}` : ''}
+                </p>
+              </div>
+            )}
+            {detailModal.description && (
+              <div>
+                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">Description</p>
+                <p className="text-sm text-text-secondary whitespace-pre-wrap">{detailModal.description}</p>
+              </div>
+            )}
+            <div>
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">Created</p>
+              <p className="text-sm text-text-secondary">{detailModal.created_at ? format(new Date(detailModal.created_at), 'dd MMM yyyy, HH:mm') : '—'}</p>
+            </div>
+            <div className="flex gap-2 pt-2">
+              {detailModal.file_url && (
+                <Button variant="secondary" onClick={() => window.open(`/${detailModal.file_url.replace(/^\//, '')}`, '_blank')} className="flex-1">
+                  <ExternalLink size={14} className="mr-2" />
+                  View File
+                </Button>
+              )}
+              <Button variant="secondary" onClick={() => downloadRecord(detailModal)} className="flex-1">
+                <Download size={14} className="mr-2" />
+                Download
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Add Record Modal */}
+      <Modal
+        isOpen={addModal}
+        onClose={() => setAddModal(false)}
+        title="Add Medical Record"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setAddModal(false)}>Cancel</Button>
+            <Button onClick={handleAddSave} isLoading={saving}>Save</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <SearchableSelect
+            label="Patient"
+            options={patientOptions}
+            value={form.patient_id}
+            onChange={(v) => setForm((p) => ({ ...p, patient_id: v, appointment_id: '' }))}
+            placeholder="Search patients…"
+            emptyText="No patients found"
+          />
+          {form.patient_id && (
+            <SearchableSelect
+              label="Link to Appointment (optional)"
+              options={appointmentOptions}
+              value={form.appointment_id}
+              onChange={(v) => setForm((p) => ({ ...p, appointment_id: v }))}
+              placeholder="Search this patient's appointments…"
+              emptyText="No appointments found for this patient"
+            />
+          )}
+          <Select label="Record Type" value={form.record_type} onChange={(e) => setForm((p) => ({ ...p, record_type: e.target.value }))}>
+            {RECORD_TYPES.map((t) => (
+              <option key={t} value={t}>{TYPE_META[t].label}</option>
+            ))}
+          </Select>
+          <div>
+            <label className="block text-sm font-medium text-text-primary mb-1.5">Notes</label>
+            <textarea
+              rows={4}
+              value={form.description}
+              onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+              placeholder="Clinical notes for this record…"
+              className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 resize-none"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-text-primary mb-1.5">Attachment (optional)</label>
+            <input type="file" onChange={(e) => setFile(e.target.files[0])} className="block w-full text-sm text-text-secondary file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-brand-600 file:text-white file:font-medium hover:file:bg-brand-700 file:cursor-pointer" />
+          </div>
+          <label className="flex items-center gap-2 text-sm text-text-secondary">
+            <input type="checkbox" checked={form.private} onChange={(e) => setForm((p) => ({ ...p, private: e.target.checked }))} className="accent-brand-600" />
+            Mark as private (doctors only, hidden from patient)
+          </label>
+        </div>
+      </Modal>
     </div>
   );
 };

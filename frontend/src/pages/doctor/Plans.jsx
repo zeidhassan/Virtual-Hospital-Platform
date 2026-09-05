@@ -26,7 +26,7 @@ const Plans = () => {
                 <h3 className="section-title">{plan.name}</h3>
                 <p className="text-text-secondary text-sm mt-1">{plan.description}</p>
                 <p className="text-3xl font-bold text-brand-700 mt-4">
-                  {plan.currency || 'SAR'} {plan.price}
+                  {plan.currency || 'MYR'} {plan.price}
                   <span className="text-sm font-normal text-text-muted">/{plan.duration || 'mo'}</span>
                 </p>
               </div>

@@ -1,10 +1,5 @@
 const db = require('../../config/db');
 
-// Helper function to check admin or doctor
-function isPrivileged(role) {
-  return role === 'admin' || role === 'doctor';
-}
-
 exports.createBill = async (req, res) => {
   const { patient_id, amount, details } = req.body;
 
@@ -22,28 +17,8 @@ exports.createBill = async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// Get bills by patient (patient can only view their own)
-exports.getBillsByPatient = async (req, res) => {
-  const userRole = req.headers['x-user-role'];
-  const userId = req.headers['x-user-id'];
-  const patientId = req.params.id;
-
-  if (userRole === 'patient' && parseInt(patientId) !== parseInt(userId)) {
-    return res.status(403).json({ error: 'Access denied' });
-  }
-
-  try {
-    const result = await db.query(
-      'SELECT * FROM bills WHERE patient_id = $1 ORDER BY billing_date DESC',
-      [patientId]
-    );
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };
 
@@ -59,7 +34,8 @@ exports.updateBillStatus = async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };
 
@@ -71,6 +47,7 @@ exports.deleteBill = async (req, res) => {
     await db.query('DELETE FROM bills WHERE id = $1', [billId]);
     res.json({ message: 'Bill deleted successfully' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };

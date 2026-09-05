@@ -7,7 +7,7 @@ describe('Auth Integration Tests', () => {
   it('should login with seeded patient account', async () => {
     const res = await request(app).post('/api/auth/login').send({
       email: 'jane@helixacare.com',
-      password: 'patient123'
+      password: 'admin123'
     });
     expect(res.statusCode).toBe(200);
     expect(res.body).toHaveProperty('token');

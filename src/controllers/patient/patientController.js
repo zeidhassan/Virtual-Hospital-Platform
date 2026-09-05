@@ -17,6 +17,7 @@ exports.getAppointments = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const sort = req.query.sort || '-appointment_date'; // optional sort param, default descending date
     const status = req.query.status || undefined;
+    const appointment_type = req.query.appointment_type || undefined;
 
     const result = await paginate({
       table: 'appointments a',
@@ -26,16 +27,17 @@ exports.getAppointments = async (req, res) => {
       sortTable: 'a',
       select: `
         a.id, a.appointment_date, a.appointment_start_time, a.appointment_end_time,
-        a.status, a.notes,
+        a.status, a.notes, a.appointment_type, a.completed_at, a.triage_session_id,
         u.full_name AS doctor_name, d.specialization
       `,
       join: `
-        JOIN doctors d ON a.doctor_id = d.id
-        JOIN users u ON d.user_id = u.id
+        LEFT JOIN doctors d ON a.doctor_id = d.id
+        LEFT JOIN users u ON d.user_id = u.id
       `,
       filters: {
         'a.patient_id': patientId,
-        'a.status': status
+        'a.status': status,
+        'a.appointment_type': appointment_type
       }
     });
 
@@ -104,7 +106,7 @@ exports.getPrescriptions = async (req, res) => {
 
     const validColumns = [
       "appointment_id",
-      "medication",
+      "medication_id",
       "issued_date",
       "limit_reached",
     ];
@@ -128,10 +130,13 @@ exports.getPrescriptions = async (req, res) => {
       },
       join: `
         JOIN appointments a ON p.appointment_id = a.id
+        LEFT JOIN doctors d ON a.doctor_id = d.id
+        LEFT JOIN users du ON d.user_id = du.id
+        JOIN medications m ON p.medication_id = m.id
       `,
       select: `
-        p.id, p.appointment_id, p.medication, p.dosage, p.instructions,
-        p.pack_limit, p.limit_reached, p.issued_date
+        p.id, p.appointment_id, m.name AS medication, p.medication_id, p.dosage, p.instructions,
+        p.pack_limit, p.refills_used, p.limit_reached, p.issued_date, du.full_name AS doctor_name
       `
     });
 
@@ -144,6 +149,111 @@ exports.getPrescriptions = async (req, res) => {
   } catch (err) {
     console.error('[ERROR] getPrescriptions:', err);
     res.status(500).json({ message: 'Failed to fetch prescriptions' });
+  }
+};
+
+// A patient requesting a refill of a prescription-only medication their doctor
+// already prescribed — the only path left to obtain one, since the pharmacy
+// no longer sells prescription-type medications directly. Creates a pending
+// pharmacy order and a matching bill for the patient to pay on their Bills page.
+exports.requestRefill = async (req, res) => {
+  try {
+    const patientResult = await db.query('SELECT id FROM patients WHERE user_id = $1', [req.user.id]);
+    if (patientResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Patient not found.' });
+    }
+    const patientId = patientResult.rows[0].id;
+
+    const { id } = req.params;
+    const rxRes = await db.query(
+      `SELECT p.*, a.patient_id FROM prescriptions p
+       JOIN appointments a ON p.appointment_id = a.id
+       WHERE p.id = $1`,
+      [id]
+    );
+    if (rxRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Prescription not found.' });
+    }
+    const rx = rxRes.rows[0];
+    if (rx.patient_id !== patientId) {
+      return res.status(403).json({ error: 'Access denied.' });
+    }
+    if (!rx.medication_id) {
+      return res.status(400).json({ error: 'This prescription predates catalog-linked refills and cannot be refilled automatically.' });
+    }
+    if (rx.limit_reached || rx.refills_used >= rx.pack_limit) {
+      return res.status(403).json({ error: 'No refills remaining for this prescription.' });
+    }
+
+    const medRes = await db.query('SELECT name, price FROM medications WHERE id = $1', [rx.medication_id]);
+    if (medRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Medication no longer exists in the catalog.' });
+    }
+    const { name, price } = medRes.rows[0];
+
+    const orderRes = await db.query(
+      `INSERT INTO pharmacy_orders (patient_id, prescription_id, medications, quantities, total_amount, status)
+       VALUES ($1, $2, $3, '1', $4, 'pending') RETURNING id`,
+      [patientId, rx.id, name, price]
+    );
+    const orderId = orderRes.rows[0].id;
+
+    const billRes = await db.query(
+      `INSERT INTO bills (patient_id, amount, status, billing_date, details, pharmacy_order_id)
+       VALUES ($1, $2, 'pending', CURRENT_DATE, $3, $4) RETURNING *`,
+      [patientId, price, `Prescription refill: ${name} (${rx.dosage})`, orderId]
+    );
+
+    const newRefillsUsed = rx.refills_used + 1;
+    await db.query(
+      `UPDATE prescriptions SET refills_used = $1, limit_reached = $2 WHERE id = $3`,
+      [newRefillsUsed, newRefillsUsed >= rx.pack_limit, rx.id]
+    );
+
+    await db.query(
+      `INSERT INTO notifications (user_id, title, body, category) VALUES ($1, $2, $3, 'billing')`,
+      [req.user.id, 'Refill Bill Ready', `A bill of MYR ${price} for your ${name} refill is ready to pay on your Bills page.`]
+    );
+
+    res.status(201).json({ message: 'Refill requested. A bill has been created for payment.', bill: billRes.rows[0], order_id: orderId });
+  } catch (err) {
+    console.error('[requestRefill]', err);
+    res.status(500).json({ error: 'Failed to request refill.' });
+  }
+};
+
+// Patient uploads their own medical record (e.g. an external lab result or
+// document) — not tied to any doctor or appointment, always visible to the
+// patient themselves and to every doctor they're linked to (via getMedicalRecords).
+exports.uploadMedicalRecord = async (req, res) => {
+  try {
+    const patientResult = await db.query('SELECT id FROM patients WHERE user_id = $1', [req.user.id]);
+    if (patientResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Patient not found.' });
+    }
+    const patientId = patientResult.rows[0].id;
+
+    const { record_type, description } = req.body;
+    if (!record_type) {
+      return res.status(400).json({ error: 'record_type is required.' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'A file is required.' });
+    }
+
+    const filePath = `uploads/medical-records/${req.file.filename}`;
+    const encryptedDescription = encrypt(description || '');
+
+    const result = await db.query(
+      `INSERT INTO medical_records (patient_id, doctor_id, appointment_id, record_type, description, file_url, created_at, private)
+       VALUES ($1, NULL, NULL, $2, $3, $4, NOW(), FALSE) RETURNING *`,
+      [patientId, record_type, encryptedDescription, filePath]
+    );
+
+    res.status(201).json({ message: 'Medical record uploaded', data: result.rows[0] });
+  } catch (err) {
+    console.error('[uploadMedicalRecord]', err);
+    res.status(500).json({ error: 'Failed to upload medical record.' });
   }
 };
 
@@ -202,8 +312,6 @@ exports.getMedicationById = async (req, res) => {
 // Get Medical Records
 exports.getMedicalRecords = async (req, res) => {
   try {
-    console.log("[DEBUG] Request received for medical records");
-
     const userId = req.user?.id;
     if (!userId) {
       console.error("[ERROR] No user ID found in token");
@@ -255,7 +363,11 @@ exports.getMedicalRecords = async (req, res) => {
       },
       select: `
         mr.id, mr.record_type, mr.description, mr.file_url, mr.created_at,
-        mr.appointment_id, mr.doctor_id
+        mr.appointment_id, mr.doctor_id, du.full_name AS doctor_name
+      `,
+      join: `
+        LEFT JOIN doctors d ON mr.doctor_id = d.id
+        LEFT JOIN users du ON d.user_id = du.id
       `
     });
 

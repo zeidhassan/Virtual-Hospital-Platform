@@ -7,9 +7,9 @@ describe('Pharmacy & Medications — Section 10', () => {
 
   beforeAll(async () => {
     const [patLogin, adminLogin, docLogin] = await Promise.all([
-      request(app).post('/api/auth/login').send({ email: 'jane@helixacare.com', password: 'patient123' }),
+      request(app).post('/api/auth/login').send({ email: 'jane@helixacare.com', password: 'admin123' }),
       request(app).post('/api/auth/login').send({ email: 'admin@helixacare.com', password: 'admin123' }),
-      request(app).post('/api/auth/login').send({ email: 'strange@helixacare.com', password: 'doctor123' }),
+      request(app).post('/api/auth/login').send({ email: 'strange@helixacare.com', password: 'admin123' }),
     ]);
     patientToken = patLogin.body.token;
     adminToken = adminLogin.body.token;

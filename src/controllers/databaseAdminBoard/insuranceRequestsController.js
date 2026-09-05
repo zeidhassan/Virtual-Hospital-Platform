@@ -19,6 +19,7 @@ exports.getAllInsuranceRequests = async (req, res) => {
       "start_date",
       "end_date",
       "status",
+      "reviewed_by",
       "created_at"
     ];
 
@@ -58,11 +59,11 @@ exports.getInsuranceRequestsById = async (req, res) => {
 
 // Create a new insurance request
 exports.createInsuranceRequests = async (req, res) => {
-  const { patient_id, doctor_id, bill_id, insurance_company, insurance_id_number, start_date, end_date, status } = req.body;
+  const { patient_id, doctor_id, bill_id, insurance_company, insurance_id_number, start_date, end_date, status, reviewed_by } = req.body;
   try {
     const result = await db.query(
-      'INSERT INTO insurance_requests (patient_id, doctor_id, bill_id, insurance_company, insurance_id_number, start_date, end_date, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
-      [patient_id, doctor_id, bill_id, insurance_company, insurance_id_number, start_date, end_date, status]
+      'INSERT INTO insurance_requests (patient_id, doctor_id, bill_id, insurance_company, insurance_id_number, start_date, end_date, status, reviewed_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+      [patient_id, doctor_id, bill_id, insurance_company, insurance_id_number, start_date, end_date, status, reviewed_by]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -73,11 +74,11 @@ exports.createInsuranceRequests = async (req, res) => {
 // Update an insurance request
 exports.updateInsuranceRequests = async (req, res) => {
   const { id } = req.params;
-  const { patient_id, doctor_id, bill_id, insurance_company, insurance_id_number, start_date, end_date, status } = req.body;
+  const { patient_id, doctor_id, bill_id, insurance_company, insurance_id_number, start_date, end_date, status, reviewed_by } = req.body;
   try {
     const result = await db.query(
-      'UPDATE insurance_requests SET patient_id=$1, doctor_id=$2, bill_id=$3, insurance_company=$4, insurance_id_number=$5, start_date=$6, end_date=$7, status=$8 WHERE id=$9 RETURNING *',
-      [patient_id, doctor_id, bill_id, insurance_company, insurance_id_number, start_date, end_date, status, id]
+      'UPDATE insurance_requests SET patient_id=$1, doctor_id=$2, bill_id=$3, insurance_company=$4, insurance_id_number=$5, start_date=$6, end_date=$7, status=$8, reviewed_by=$9 WHERE id=$10 RETURNING *',
+      [patient_id, doctor_id, bill_id, insurance_company, insurance_id_number, start_date, end_date, status, reviewed_by, id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Insurance request not found' });
     res.json(result.rows[0]);

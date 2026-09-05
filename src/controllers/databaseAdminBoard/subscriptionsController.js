@@ -65,13 +65,13 @@ exports.createSubscription = async (req, res) => {
     return res.status(403).json({ error: 'Only admins can create subscriptions.' });
   }
 
-  const { patient_id, plan_name, start_date, end_date, auto_renew } = req.body;
+  const { patient_id, plan_name, start_date, end_date, auto_renew, status } = req.body;
 
   try {
     const result = await pool.query(
-      `INSERT INTO subscriptions (patient_id, plan_name, start_date, end_date, auto_renew)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [patient_id, plan_name, start_date, end_date, auto_renew]
+      `INSERT INTO subscriptions (patient_id, plan_name, start_date, end_date, auto_renew, status)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [patient_id, plan_name, start_date, end_date, auto_renew, status]
     );
 
     res.status(201).json(result.rows[0]);
@@ -86,14 +86,14 @@ exports.updateSubscription = async (req, res) => {
     return res.status(403).json({ error: 'Only admins can update subscriptions.' });
   }
 
-  const { plan_name, start_date, end_date, auto_renew } = req.body;
+  const { plan_name, start_date, end_date, auto_renew, status } = req.body;
 
   try {
     const result = await pool.query(
-      `UPDATE subscriptions 
-       SET plan_name=$1, start_date=$2, end_date=$3, auto_renew=$4
-       WHERE id=$5 RETURNING *`,
-      [plan_name, start_date, end_date, auto_renew, req.params.id]
+      `UPDATE subscriptions
+       SET plan_name=$1, start_date=$2, end_date=$3, auto_renew=$4, status=$5
+       WHERE id=$6 RETURNING *`,
+      [plan_name, start_date, end_date, auto_renew, status, req.params.id]
     );
 
     if (result.rows.length === 0) {

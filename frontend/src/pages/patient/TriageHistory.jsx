@@ -1,10 +1,11 @@
 import { getTriageHistory } from '@/api/triage';
-import useFetch from '@/hooks/useFetch';
+import usePaginatedFetch from '@/hooks/usePaginatedFetch';
 import Card, { CardHeader } from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Spinner from '@/components/ui/Spinner';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
+import Pagination from '@/components/ui/Pagination';
 import { Activity } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -16,8 +17,7 @@ const URGENCY_VARIANT = {
 };
 
 const TriageHistory = () => {
-  const { data, isLoading, error, refetch } = useFetch(getTriageHistory);
-  const sessions = data?.data || [];
+  const { data: sessions, isLoading, error, currentPage, totalPages, totalItems, pageSize, setPage, refetch } = usePaginatedFetch(getTriageHistory);
 
   return (
     <div className="animate-fade-in">
@@ -71,6 +71,7 @@ const TriageHistory = () => {
             </table>
           </div>
         )}
+        <Pagination currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} pageSize={pageSize} onPageChange={setPage} />
       </Card>
     </div>
   );

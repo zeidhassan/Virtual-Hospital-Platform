@@ -3,7 +3,7 @@ const router = express.Router();
 const controller = require('../../controllers/PharmacyOrders/pharmacyOrderController');
 const requireRole = require('../../middleware/requireRole');
 const verifyToken = require('../../middleware/verifyToken');
-const { uploadPrescription } = require('../../middleware/uploadMiddleware');
+const { uploadPrescription, wrapUpload } = require('../../middleware/uploadMiddleware');
 
 /**
  * @swagger
@@ -104,7 +104,7 @@ router.get('/', verifyToken, requireRole(['admin', 'doctor']), controller.getAll
  *       400:
  *         description: Validation error
  */
-router.post('/', verifyToken, requireRole('patient'), uploadPrescription.single('prescription_file'), controller.createOrder);
+router.post('/', verifyToken, requireRole('patient'), wrapUpload(uploadPrescription, 'prescription_file'), controller.createOrder);
 
 /**
  * @swagger

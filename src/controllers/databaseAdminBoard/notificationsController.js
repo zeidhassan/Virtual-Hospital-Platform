@@ -15,6 +15,10 @@ exports.getAllNotifications = async (req, res) => {
       "title",
       "body",
       "is_read",
+      "type",
+      "category",
+      "actor_name",
+      "actor_role",
       "created_at"
     ];
 
@@ -60,13 +64,13 @@ exports.getNotificationById = async (req, res) => {
 
 // CREATE a notification (admin only)
 exports.createNotification = async (req, res) => {
-  const { user_id, title, body, is_read } = req.body;
+  const { user_id, title, body, is_read, type, category, actor_name, actor_role } = req.body;
 
   try {
     const result = await pool.query(
-      `INSERT INTO notifications (user_id, title, body, is_read)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [user_id, title, body, is_read]
+      `INSERT INTO notifications (user_id, title, body, is_read, type, category, actor_name, actor_role)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [user_id, title, body, is_read, type, category, actor_name, actor_role]
     );
 
     res.status(201).json(result.rows[0]);
@@ -81,14 +85,14 @@ exports.updateNotification = async (req, res) => {
     return res.status(403).json({ error: 'Only admins can update notifications.' });
   }
 
-  const { title, body, is_read } = req.body;
+  const { title, body, is_read, type, category, actor_name, actor_role } = req.body;
 
   try {
     const result = await pool.query(
-      `UPDATE notifications 
-       SET title = $1, body = $2, is_read = $3 
-       WHERE id = $4 RETURNING *`,
-      [title, body, is_read, req.params.id]
+      `UPDATE notifications
+       SET title = $1, body = $2, is_read = $3, type = $4, category = $5, actor_name = $6, actor_role = $7
+       WHERE id = $8 RETURNING *`,
+      [title, body, is_read, type, category, actor_name, actor_role, req.params.id]
     );
 
     if (result.rows.length === 0) {

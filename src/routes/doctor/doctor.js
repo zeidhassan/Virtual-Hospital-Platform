@@ -3,6 +3,7 @@ const router = express.Router();
 const doctorController = require('../../controllers/doctor/doctorController');
 const requireRole = require('../../middleware/requireRole');
 const verifyToken = require('../../middleware/verifyToken')
+const { uploadMedicalRecord, wrapUpload } = require('../../middleware/uploadMiddleware');
 router.use(verifyToken);
 router.use(requireRole('doctor'))
 
@@ -103,6 +104,7 @@ router.get('/appointment-stats', doctorController.getAppointmentStats);
  *         description: Unauthorized
  */
 router.get('/records', doctorController.getMedicalRecords);
+router.post('/patients/:patientId/records', wrapUpload(uploadMedicalRecord, 'medical_record_file'), doctorController.addPatientRecord);
 /**
  * @swagger
  * /api/doctor/records/{id}:

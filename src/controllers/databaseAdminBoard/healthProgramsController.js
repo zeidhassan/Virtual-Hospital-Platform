@@ -64,13 +64,13 @@ exports.createProgram = async (req, res) => {
     return res.status(403).json({ error: 'Only admins can create programs.' });
   }
 
-  const { name, description, start_date, end_date } = req.body;
+  const { name, description, start_date, end_date, eligibility } = req.body;
 
   try {
     const result = await pool.query(
-      `INSERT INTO health_programs (name, description, start_date, end_date)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [name, description, start_date, end_date]
+      `INSERT INTO health_programs (name, description, start_date, end_date, eligibility)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [name, description, start_date, end_date, eligibility]
     );
 
     res.status(201).json(result.rows[0]);
@@ -85,14 +85,14 @@ exports.updateProgram = async (req, res) => {
     return res.status(403).json({ error: 'Only admins can update programs.' });
   }
 
-  const { name, description, start_date, end_date } = req.body;
+  const { name, description, start_date, end_date, eligibility } = req.body;
 
   try {
     const result = await pool.query(
       `UPDATE health_programs
-       SET name=$1, description=$2, start_date=$3, end_date=$4
-       WHERE id=$5 RETURNING *`,
-      [name, description, start_date, end_date, req.params.id]
+       SET name=$1, description=$2, start_date=$3, end_date=$4, eligibility=$5
+       WHERE id=$6 RETURNING *`,
+      [name, description, start_date, end_date, eligibility, req.params.id]
     );
 
     if (result.rows.length === 0) {

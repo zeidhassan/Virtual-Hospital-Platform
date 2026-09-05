@@ -1,11 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const {
-  addMedicalRecord,
-  getRecordsByPatient,
-  getRecordsByDoctor,
-  deleteRecord
-} = require('../../controllers/medicalRecords/medicalRecordController');
+const { deleteRecord } = require('../../controllers/medicalRecords/medicalRecordController');
 
 const verifyToken = require('../../middleware/verifyToken');
 const requireRole = require('../../middleware/requireRole');
@@ -17,53 +12,9 @@ const requireRole = require('../../middleware/requireRole');
  *   description: Medical record management
  */
 
-router.post('/', verifyToken, requireRole(['patient', 'doctor']), addMedicalRecord);
-
-/**
- * @swagger
- * /api/medical-records/patient/{id}:
- *   get:
- *     summary: Get medical records for a patient
- *     tags: [Medical Records]
- *     parameters:
- *       - in: path
- *         name: id
- *         schema:
- *           type: integer
- *         required: true
- *         description: Patient ID
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of medical records
- *       403:
- *         description: Access denied
- */
-router.get('/patient/:id', verifyToken, requireRole(['patient', 'admin']), getRecordsByPatient);
-
-/**
- * @swagger
- * /api/medical-records/doctor/{id}:
- *   get:
- *     summary: Get medical records uploaded by a doctor
- *     tags: [Medical Records]
- *     parameters:
- *       - in: path
- *         name: id
- *         schema:
- *           type: integer
- *         required: true
- *         description: Doctor ID
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of medical records
- *       403:
- *         description: Access denied
- */
-router.get('/doctor/:id', verifyToken, requireRole(['doctor', 'admin']), getRecordsByDoctor);
+// Uploading and listing records now happen through the role-scoped routes in
+// /api/doctor/patients/:patientId/records and /api/patient/records — this
+// module only keeps the delete capability, which has no equivalent there yet.
 
 /**
  * @swagger

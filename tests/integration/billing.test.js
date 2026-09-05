@@ -14,13 +14,13 @@ describe('Billing API Tests', () => {
 
     const loginDoctor = await request(app).post('/api/auth/login').send({
       email: 'strange@helixacare.com',
-      password: 'doctor123'
+      password: 'admin123'
     });
     doctorToken = loginDoctor.body.token;
 
     const loginPatient = await request(app).post('/api/auth/login').send({
       email: 'jane@helixacare.com',
-      password: 'patient123'
+      password: 'admin123'
     });
     patientToken = loginPatient.body.token;
   });
@@ -42,13 +42,11 @@ describe('Billing API Tests', () => {
 
   it('should allow patient to view their own bills', async () => {
     const res = await request(app)
-      .get('/api/payments/bills/patient/1')
-      .set('Authorization', `Bearer ${patientToken}`)
-      .set('x-user-id', '1') // required by controller
-      .set('x-user-role', 'patient'); // also required
+      .get('/api/payments/bills/my')
+      .set('Authorization', `Bearer ${patientToken}`);
 
     expect(res.statusCode).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
   });
 
   it('should allow doctor to update bill status', async () => {

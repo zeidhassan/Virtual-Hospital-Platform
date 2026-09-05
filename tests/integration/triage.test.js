@@ -8,9 +8,9 @@ describe('Triage Integration Tests', () => {
 
   beforeAll(async () => {
     const [patientRes, adminRes, doctorRes] = await Promise.all([
-      request(app).post('/api/auth/login').send({ email: 'jane@helixacare.com', password: 'patient123' }),
+      request(app).post('/api/auth/login').send({ email: 'jane@helixacare.com', password: 'admin123' }),
       request(app).post('/api/auth/login').send({ email: 'admin@helixacare.com', password: 'admin123' }),
-      request(app).post('/api/auth/login').send({ email: 'strange@helixacare.com', password: 'doctor123' }),
+      request(app).post('/api/auth/login').send({ email: 'strange@helixacare.com', password: 'admin123' }),
     ]);
     patientToken = patientRes.body.token;
     adminToken = adminRes.body.token;
@@ -92,10 +92,10 @@ describe('Triage Integration Tests', () => {
     expect(ids).toContain(triageSessionId);
   });
 
-  // 2.7 — follow-up auto-created for emergency
-  it('2.7: follow_up_schedules row created for emergency session', async () => {
+  // 2.7 — follow-up auto-created for emergency (as an appointment, appointment_type='follow_up')
+  it('2.7: follow-up appointment created for emergency session', async () => {
     const { rows } = await pool.query(
-      'SELECT * FROM follow_up_schedules WHERE triage_session_id = $1',
+      `SELECT * FROM appointments WHERE triage_session_id = $1 AND appointment_type = 'follow_up'`,
       [triageSessionId]
     );
     expect(rows.length).toBeGreaterThan(0);

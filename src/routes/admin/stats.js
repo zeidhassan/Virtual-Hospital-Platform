@@ -48,6 +48,18 @@ router.get('/appointments', requireRole('admin'), statsController.getAppointment
 
 /**
  * @swagger
+ * /api/admin/stats/appointments-monthly:
+ *   get:
+ *     summary: Appointment volume for each of the last 6 months
+ *     tags: [AdminStats]
+ *     responses:
+ *       200:
+ *         description: Array of { month, count }
+ */
+router.get('/appointments-monthly', requireRole('admin'), statsController.getAppointmentsMonthlyTrend);
+
+/**
+ * @swagger
  * /api/admin/stats/prescriptions:
  *   get:
  *     summary: Count prescriptions issued by doctors

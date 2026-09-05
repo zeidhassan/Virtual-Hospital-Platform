@@ -57,6 +57,10 @@ router.use(verifyToken);
  */
 router.get('/', requireRole('admin'), controller.getAllAppointments);
 
+router.post('/', requireRole('admin'), controller.createAppointment);
+
+router.post('/:id/remind', requireRole('admin'), controller.sendAppointmentReminder);
+
 router.get('/available-time-slots', requireRole('admin'), controller.getAvailableTimeSlots);
 /**
  * @swagger

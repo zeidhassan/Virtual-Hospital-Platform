@@ -14,7 +14,8 @@ exports.getAllMedications = async (req, res) => {
       "name",
       "type",
       "description",
-      "price"
+      "price",
+      "photo_url"
     ];
 
     const filters = {};
@@ -53,11 +54,11 @@ exports.getMedicationById = async (req, res) => {
 
 // Create a new medication
 exports.createMedication = async (req, res) => {
-  const { name, type, description, price } = req.body;
+  const { name, type, description, price, photo_url } = req.body;
   try {
     const result = await db.query(
-      'INSERT INTO medications (name, type, description, price) VALUES ($1, $2, $3, $4) RETURNING *',
-      [name, type, description, price]
+      'INSERT INTO medications (name, type, description, price, photo_url) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [name, type, description, price, photo_url]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -68,11 +69,11 @@ exports.createMedication = async (req, res) => {
 // Update a medication
 exports.updateMedication = async (req, res) => {
   const { id } = req.params;
-  const { name, type, description, price } = req.body;
+  const { name, type, description, price, photo_url } = req.body;
   try {
     const result = await db.query(
-      'UPDATE medications SET name=$1, type=$2, description=$3, price=$4 WHERE id=$5 RETURNING *',
-      [name, type, description, price, id]
+      'UPDATE medications SET name=$1, type=$2, description=$3, price=$4, photo_url=$5 WHERE id=$6 RETURNING *',
+      [name, type, description, price, photo_url, id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Medication not found' });
     res.json(result.rows[0]);

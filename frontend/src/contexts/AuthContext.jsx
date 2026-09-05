@@ -4,6 +4,11 @@ import * as authApi from '@/api/auth';
 
 const AuthContext = createContext(null);
 
+// Backend responses key the display name as `full_name`; normalize it to
+// `name` so every consumer (Sidebar, dashboards, greetings, etc.) can rely
+// on a single field instead of falling back to the email address.
+const normalizeUser = (user) => (user ? { ...user, name: user.name || user.full_name || '' } : user);
+
 const initialState = {
   user: null,
   isAuthenticated: false,
@@ -30,7 +35,6 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const restoreSession = async () => {
       const stored = localStorage.getItem('hxc_token');
-      const storedUser = localStorage.getItem('hxc_user');
 
       if (!stored) {
         dispatch({ type: 'LOADED' });
@@ -43,21 +47,15 @@ export function AuthProvider({ children }) {
       try {
         // Attempt to verify the token with the backend
         const { data } = await authApi.getMe();
-        const user = data.user || data;
+        const user = normalizeUser(data.user || data);
         dispatch({ type: 'SET_USER', payload: user });
       } catch {
-        // Token is invalid/expired — try to use stored user for graceful fallback
-        if (storedUser) {
-          try {
-            dispatch({ type: 'SET_USER', payload: JSON.parse(storedUser) });
-          } catch {
-            clearSession();
-            dispatch({ type: 'LOADED' });
-          }
-        } else {
-          clearSession();
-          dispatch({ type: 'LOADED' });
-        }
+        // Token is invalid/expired — the server is the only source of truth
+        // for who's logged in. Falling back to the cached hxc_user here
+        // would let a client-edited localStorage value (e.g. a tampered
+        // "role") stand in as an authenticated session.
+        clearSession();
+        dispatch({ type: 'LOADED' });
       }
     };
 
@@ -75,12 +73,12 @@ export function AuthProvider({ children }) {
 
     // Backend may return { token, user } or { token, role, userId, ... }
     const token = data.token || data.accessToken;
-    const user = data.user || {
+    const user = normalizeUser(data.user || {
       id: data.userId || data.id,
       role: data.role,
       email: credentials.email,
       name: data.name || data.username || '',
-    };
+    });
 
     setAccessToken(token);
     localStorage.setItem('hxc_token', token);
@@ -94,12 +92,12 @@ export function AuthProvider({ children }) {
     const { data } = await authApi.register(userData);
 
     const token = data.token || data.accessToken;
-    const user = data.user || {
+    const user = normalizeUser(data.user || {
       id: data.userId || data.id,
       role: userData.role,
       email: userData.email,
       name: userData.name || userData.username || '',
-    };
+    });
 
     if (token) {
       setAccessToken(token);
@@ -124,8 +122,22 @@ export function AuthProvider({ children }) {
     dispatch({ type: 'LOGOUT' });
   }, []);
 
+  // Re-pulls /auth/me so edits made on the profile page (name, picture, etc.)
+  // show up immediately in the Sidebar/Topbar instead of waiting for the next login.
+  const refreshUser = useCallback(async () => {
+    try {
+      const { data } = await authApi.getMe();
+      const user = normalizeUser(data.user || data);
+      localStorage.setItem('hxc_user', JSON.stringify(user));
+      dispatch({ type: 'SET_USER', payload: user });
+      return user;
+    } catch {
+      return null;
+    }
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ ...state, login, register, logout }}>
+    <AuthContext.Provider value={{ ...state, login, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

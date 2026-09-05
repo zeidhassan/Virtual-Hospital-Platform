@@ -36,9 +36,27 @@ export const getPatientAnswers = (params = {}) =>
 export const suggestQuestion = (data) =>
   apiClient.post('/questions/suggest', data);
 
-// Doctor medical records (records this doctor has created)
+// Approved public questions available to assign to a patient
+export const getQuestionBank = (params = {}) =>
+  apiClient.get('/questions/public', { params: { approval: true, ...params } });
+
+// Assign specific bank questions to a patient
+export const assignQuestionsToPatient = (data) =>
+  apiClient.post('/question-assignments', data);
+
+// This doctor's question assignments for one patient
+export const getPatientQuestionAssignments = (patientId) =>
+  apiClient.get(`/question-assignments/patient/${patientId}`);
+
+// All medical records for patients this doctor is linked to (not just ones they created)
 export const getDoctorRecords = (params = {}) =>
   apiClient.get('/doctor/records', { params });
+
+// Add a medical record directly for a linked patient (appointment optional)
+export const addPatientRecord = (patientId, formData) =>
+  apiClient.post(`/doctor/patients/${patientId}/records`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
 
 // Doctor prescriptions
 export const getDoctorPrescriptions = (params = {}) =>

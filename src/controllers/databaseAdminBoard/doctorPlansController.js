@@ -78,7 +78,7 @@ exports.createDoctorPlans = async (req, res) => {
     const result = await db.query(
       `INSERT INTO doctor_plans (name, description, monthly_price, yearly_price, features, currency)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [name, description, monthly_price, yearly_price, parsedFeatures, currency || 'SAR']
+      [name, description, monthly_price, yearly_price, parsedFeatures, currency || 'MYR']
     );
 
     res.status(201).json(result.rows[0]);
@@ -99,7 +99,7 @@ exports.updateDoctorPlans = async (req, res) => {
       `UPDATE doctor_plans
        SET name = $1, description = $2, monthly_price = $3, yearly_price = $4, features = $5, currency = $6
        WHERE id = $7 RETURNING *`,
-      [name, description, monthly_price, yearly_price, parsedFeatures, currency || 'SAR', id]
+      [name, description, monthly_price, yearly_price, parsedFeatures, currency || 'MYR', id]
     );
 
     if (result.rows.length === 0)

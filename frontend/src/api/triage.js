@@ -4,15 +4,15 @@ import apiClient from './client';
 export const assessTriage = (data) =>
   apiClient.post('/triage/assess', data);
 
-export const getTriageHistory = () =>
-  apiClient.get('/triage/history');
+export const getTriageHistory = (params = {}) =>
+  apiClient.get('/triage/history', { params });
 
 export const getTriageSession = (id) =>
   apiClient.get(`/triage/session/${id}`);
 
 // Doctor
-export const getEscalatedSessions = () =>
-  apiClient.get('/triage/escalated');
+export const getEscalatedSessions = (params = {}) =>
+  apiClient.get('/triage/escalated', { params });
 
 // Admin
 export const getAdminSessions = (params = {}) =>

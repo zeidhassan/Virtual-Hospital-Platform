@@ -35,7 +35,7 @@ const PlanCard = ({ plan, selected, onSelect, billingCycle }) => {
       <div className="flex items-center justify-between mb-2">
         <p className="font-semibold text-text-primary text-base">{plan.name}</p>
         <p className="text-brand-600 font-bold text-lg">
-          {plan.currency || 'SAR'} {Number(price).toFixed(2)}
+          {plan.currency || 'MYR'} {Number(price).toFixed(2)}
           <span className="text-xs font-normal text-text-muted">
             /{billingCycle === 'yearly' ? 'yr' : 'mo'}
           </span>
@@ -418,8 +418,8 @@ const MySubscription = () => {
                 <p className="text-xs text-text-muted">Price</p>
                 <p className="text-sm font-medium text-text-primary mt-0.5">
                   {sub.billing_cycle === 'yearly'
-                    ? `SAR ${Number(sub.yearly_price || 0).toFixed(2)}/yr`
-                    : `SAR ${Number(sub.monthly_price || 0).toFixed(2)}/mo`}
+                    ? `MYR ${Number(sub.yearly_price || 0).toFixed(2)}/yr`
+                    : `MYR ${Number(sub.monthly_price || 0).toFixed(2)}/mo`}
                 </p>
               </div>
               <div>

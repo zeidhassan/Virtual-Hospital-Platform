@@ -50,23 +50,43 @@ exports.getSpecialtyQuestions = async (req, res) => {
   }
 };
 
+async function resolveOwnPatientId(userId) {
+  const r = await db.query('SELECT id FROM patients WHERE user_id = $1', [userId]);
+  return r.rows[0]?.id ?? null;
+}
+
+// Links a freshly-submitted response back to a pending doctor-assigned question
+// for the same patient+question, if one exists, so the assignment shows as answered.
+async function linkAssignmentToResponse(patientId, questionId, responseId) {
+  await db.query(
+    `UPDATE question_assignments SET response_id = $1
+     WHERE patient_id = $2 AND question_id = $3 AND response_id IS NULL`,
+    [responseId, patientId, questionId]
+  );
+}
+
 exports.submitAnswer = async (req, res) => {
   if (req.user.role !== 'patient') {
     return res.status(403).json({ error: 'Only patients can submit answers' });
   }
 
-  const { patient_id, question_id, answer } = req.body;
+  const { question_id, answer } = req.body;
 
-  if (!patient_id || !question_id || !answer) {
-    return res.status(400).json({ error: 'patient_id, question_id, and answer are required.' });
+  if (!question_id || !answer) {
+    return res.status(400).json({ error: 'question_id and answer are required.' });
   }
 
   try {
-    await db.query(
-      `INSERT INTO patient_question_responses (patient_id, question_id, answer) 
-       VALUES ($1, $2, $3)`,
-      [patient_id, question_id, answer]
+    const patientId = await resolveOwnPatientId(req.user.id);
+    if (!patientId) return res.status(404).json({ error: 'Patient not found.' });
+
+    const result = await db.query(
+      `INSERT INTO patient_question_responses (patient_id, question_id, answer)
+       VALUES ($1, $2, $3) RETURNING id`,
+      [patientId, question_id, answer]
     );
+    await linkAssignmentToResponse(patientId, question_id, result.rows[0].id);
+
     res.status(201).json({ message: 'Answer submitted successfully' });
   } catch (err) {
     console.error(err);
@@ -79,18 +99,26 @@ exports.submitBulkAnswers = async (req, res) => {
     return res.status(403).json({ error: 'Only patients can submit answers' });
   }
 
-  const { patient_id, answers } = req.body;
+  const { answers } = req.body;
 
-  if (!patient_id || !Array.isArray(answers) || answers.length === 0) {
+  if (!Array.isArray(answers) || answers.length === 0) {
     return res.status(400).json({ error: 'Invalid request body.' });
   }
 
   try {
-    const queryText = `INSERT INTO patient_question_responses (patient_id, question_id, answer) VALUES ` +
-      answers.map((_, i) => `($1, $${i * 2 + 2}, $${i * 2 + 3})`).join(',');
-    const values = [patient_id, ...answers.flatMap(a => [a.question_id, a.answer])];
+    const patientId = await resolveOwnPatientId(req.user.id);
+    if (!patientId) return res.status(404).json({ error: 'Patient not found.' });
 
-    await db.query(queryText, values);
+    const queryText = `INSERT INTO patient_question_responses (patient_id, question_id, answer) VALUES ` +
+      answers.map((_, i) => `($1, $${i * 2 + 2}, $${i * 2 + 3})`).join(',') +
+      ' RETURNING id, question_id';
+    const values = [patientId, ...answers.flatMap(a => [a.question_id, a.answer])];
+
+    const inserted = await db.query(queryText, values);
+    for (const row of inserted.rows) {
+      await linkAssignmentToResponse(patientId, row.question_id, row.id);
+    }
+
     res.status(201).json({ message: 'Answers submitted successfully' });
   } catch (err) {
     console.error('[submitBulkAnswers] Error:', err.message);
@@ -116,9 +144,7 @@ exports.getResponsesByPatient = async (req, res) => {
       const ownPatientId = result.rows[0].id;
       const requestedPatientId = parseInt(req.params.patientId, 10);
 
-      console.log(`[DEBUG] Token userId: ${req.user.id}, ownPatientId: ${ownPatientId}, requestedPatientId: ${requestedPatientId}`);
-
-      // ‼️ Fix: compare requestedPatientId (from URL) against ownPatientId, NOT an undefined variable.
+      // Compare requestedPatientId (from URL) against ownPatientId.
       if (!ownPatientId || requestedPatientId !== ownPatientId) {
         return res.status(403).json({ error: 'Access denied. You can only view your own responses.' });
       }
@@ -240,26 +266,39 @@ exports.getMyResponses = async (req, res) => {
     if (patientRow.rowCount === 0) {
       return res.status(404).json({ error: 'Patient not found.' });
     }
-    //const patientId = patientRow.rows[0].id;
-    const patientId = req.user.id
-    // Now fetch all responses for that patient_id
-    const responses = await db.query(
-      `SELECT
-         r.id           AS response_id,
-         q.question_text,
-         r.answer,
-         r.created_at,
-         n.note,
-         n.created_at   AS note_created_at
-       FROM patient_question_responses r
-       JOIN question_bank q ON r.question_id = q.id
-       LEFT JOIN doctor_response_notes n ON r.id = n.response_id
-       WHERE r.patient_id = $1
-       ORDER BY r.created_at DESC`,
-      [patientId]
-    );
+    const patientId = patientRow.rows[0].id;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
 
-    return res.status(200).json(responses.rows);
+    const [dataRes, countRes] = await Promise.all([
+      db.query(
+        `SELECT
+           r.id           AS response_id,
+           q.question_text,
+           r.answer,
+           r.created_at,
+           n.note,
+           n.created_at   AS note_created_at
+         FROM patient_question_responses r
+         JOIN question_bank q ON r.question_id = q.id
+         LEFT JOIN doctor_response_notes n ON r.id = n.response_id
+         WHERE r.patient_id = $1
+         ORDER BY r.created_at DESC
+         LIMIT $2 OFFSET $3`,
+        [patientId, limit, offset]
+      ),
+      db.query('SELECT COUNT(*) FROM patient_question_responses WHERE patient_id = $1', [patientId]),
+    ]);
+    const total = parseInt(countRes.rows[0].count);
+
+    return res.status(200).json({
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      pageSize: limit,
+      totalItems: total,
+      data: dataRes.rows,
+    });
 
   } catch (err) {
     console.error('[getMyResponses] Error:', err.stack || err);
@@ -309,6 +348,20 @@ exports.getDoctorPatientResponses = async (req, res) => {
     if (doctorResult.rowCount === 0) return res.status(404).json({ error: 'Doctor not found.' });
     const doctorId = doctorResult.rows[0].id;
 
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    const where = `WHERE p.id IN (SELECT DISTINCT patient_id FROM appointments WHERE doctor_id = $1)`;
+
+    const countRes = await db.query(
+      `SELECT COUNT(*) FROM patient_question_responses r
+       JOIN patients p ON r.patient_id = p.id
+       ${where}`,
+      [doctorId]
+    );
+    const total = parseInt(countRes.rows[0].count);
+
     const responses = await db.query(
       `SELECT
          r.id, r.patient_id, r.question_id, r.answer, r.created_at,
@@ -318,14 +371,19 @@ exports.getDoctorPatientResponses = async (req, res) => {
        JOIN patients p ON r.patient_id = p.id
        JOIN users u ON p.user_id = u.id
        JOIN question_bank q ON r.question_id = q.id
-       WHERE p.id IN (
-         SELECT DISTINCT patient_id FROM appointments WHERE doctor_id = $1
-       )
-       ORDER BY r.created_at DESC`,
-      [doctorId]
+       ${where}
+       ORDER BY r.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [doctorId, limit, offset]
     );
 
-    res.json(responses.rows);
+    res.json({
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      pageSize: limit,
+      totalItems: total,
+      data: responses.rows,
+    });
   } catch (err) {
     console.error('[getDoctorPatientResponses]', err);
     res.status(500).json({ error: 'Server error.' });

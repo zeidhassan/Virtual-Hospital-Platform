@@ -20,6 +20,9 @@ const lazy_ = (fn) => {
   );
 };
 
+// Public pages
+const LandingPage = () => lazy_(() => import('@/pages/LandingPage'));
+
 // Auth pages
 const LoginPage = () => lazy_(() => import('@/pages/auth/LoginPage'));
 const RegisterPage = () => lazy_(() => import('@/pages/auth/RegisterPage'));
@@ -30,10 +33,11 @@ const NotFoundPage = () => lazy_(() => import('@/pages/shared/NotFoundPage'));
 const UnauthorizedPage = () => lazy_(() => import('@/pages/shared/UnauthorizedPage'));
 const ViewProfile = () => lazy_(() => import('@/pages/shared/ViewProfile'));
 const UpdateProfile = () => lazy_(() => import('@/pages/shared/UpdateProfile'));
+const MessagesPage = () => lazy_(() => import('@/pages/shared/Messages'));
+const NotificationsPage = () => lazy_(() => import('@/pages/shared/NotificationsPage'));
 
 // Patient pages
 const PatientDashboard = () => lazy_(() => import('@/pages/patient/PatientDashboard'));
-const PatientAppointments = () => lazy_(() => import('@/pages/patient/Appointments'));
 const BookAppointment = () => lazy_(() => import('@/pages/patient/BookAppointment'));
 const MyAppointments = () => lazy_(() => import('@/pages/patient/MyAppointments'));
 const PatientMedicalRecords = () => lazy_(() => import('@/pages/patient/MedicalRecords'));
@@ -42,13 +46,12 @@ const PlaceOrder = () => lazy_(() => import('@/pages/patient/PlaceOrder'));
 const MyOrders = () => lazy_(() => import('@/pages/patient/MyOrders'));
 const AnswerQuestions = () => lazy_(() => import('@/pages/patient/AnswerQuestions'));
 const MyAnswers = () => lazy_(() => import('@/pages/patient/MyAnswers'));
-const BillingPayments = () => lazy_(() => import('@/pages/patient/PaypalPage'));
+const BillingPayments = () => lazy_(() => import('@/pages/patient/BillingPayments'));
 const PaymentMethods = () => lazy_(() => import('@/pages/patient/PaymentMethods'));
 const TriageAssess = () => lazy_(() => import('@/pages/patient/TriageAssess'));
 const TriageHistory = () => lazy_(() => import('@/pages/patient/TriageHistory'));
 const PatientInsuranceRequests = () => lazy_(() => import('@/pages/patient/InsuranceRequests'));
 const PatientSupportTickets = () => lazy_(() => import('@/pages/patient/SupportTickets'));
-const PatientFollowUps = () => lazy_(() => import('@/pages/patient/FollowUps'));
 const PatientHealthLogs = () => lazy_(() => import('@/pages/patient/HealthLogs'));
 const PatientConsultationHistory = () => lazy_(() => import('@/pages/patient/ConsultationHistory'));
 
@@ -65,8 +68,8 @@ const MySubscription = () => lazy_(() => import('@/pages/doctor/MySubscription')
 const MyTimeSlots = () => lazy_(() => import('@/pages/doctor/TimeSlots'));
 const DoctorInsurance = () => lazy_(() => import('@/pages/doctor/Insurance'));
 const EscalatedTriage = () => lazy_(() => import('@/pages/doctor/EscalatedTriage'));
-const DoctorFollowUps = () => lazy_(() => import('@/pages/doctor/FollowUps'));
 const DoctorPatientTimeline = () => lazy_(() => import('@/pages/doctor/PatientTimeline'));
+const DoctorPharmacyOrders = () => lazy_(() => import('@/pages/doctor/PharmacyOrders'));
 
 // Admin pages
 const AdminDashboard = () => lazy_(() => import('@/pages/admin/AdminDashboard'));
@@ -80,25 +83,20 @@ const AdminDoctorSubscriptions = () => lazy_(() => import('@/pages/admin/DoctorS
 const AdminDoctorTimeSlots = () => lazy_(() => import('@/pages/admin/DoctorTimeSlots'));
 const AdminInsurance = () => lazy_(() => import('@/pages/admin/InsuranceAdmin'));
 const AdminQuestions = () => lazy_(() => import('@/pages/admin/Questions'));
-const AdminPasswords = () => lazy_(() => import('@/pages/admin/Passwords'));
 const DatabaseAdmin = () => lazy_(() => import('@/pages/admin/DatabaseAdmin'));
 const TriageSessions = () => lazy_(() => import('@/pages/admin/TriageSessions'));
 const TriageRules = () => lazy_(() => import('@/pages/admin/TriageRules'));
-const AdminFollowUps = () => lazy_(() => import('@/pages/admin/FollowUps'));
 const AdminConsultationHistory = () => lazy_(() => import('@/pages/admin/ConsultationHistory'));
+const AdminSupportTickets = () => lazy_(() => import('@/pages/admin/SupportTickets'));
 
 export const router = createBrowserRouter([
-  // Root redirect
-  { path: '/', element: <Navigate to="/login" replace /> },
+  // Public landing page
+  { path: '/', element: <LandingPage /> },
+  { path: '/landing', element: <LandingPage /> },
 
-  // Auth routes
-  {
-    element: <AuthLayout />,
-    children: [
-      { path: '/login', element: <LoginPage /> },
-      { path: '/register', element: <RegisterPage /> },
-    ],
-  },
+  // Auth routes - Both use their own full-screen layouts
+  { path: '/login', element: <LoginPage /> },
+  { path: '/register', element: <RegisterPage /> },
 
   // OAuth callback routes — backend redirects here with ?token=<jwt>
   { path: '/login-callback/google', element: <OAuthCallbackPage /> },
@@ -107,6 +105,20 @@ export const router = createBrowserRouter([
   // Shared error pages (no layout)
   { path: '/unauthorized', element: <UnauthorizedPage /> },
   { path: '*', element: <NotFoundPage /> },
+
+  // Shared routes — accessible by any authenticated user regardless of role
+  {
+    element: (
+      <ProtectedRoute>
+        <AppLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { path: '/notifications', element: <NotificationsPage /> },
+      { path: '/profile', element: <ViewProfile /> },
+      { path: '/profile/edit', element: <UpdateProfile /> },
+    ],
+  },
 
   // Patient routes
   {
@@ -117,7 +129,6 @@ export const router = createBrowserRouter([
     ),
     children: [
       { path: '/patient/dashboard', element: <PatientDashboard /> },
-      { path: '/patient/appointments', element: <PatientAppointments /> },
       { path: '/patient/book-appointment', element: <BookAppointment /> },
       { path: '/patient/my-appointments', element: <MyAppointments /> },
       { path: '/patient/medical-records', element: <PatientMedicalRecords /> },
@@ -132,11 +143,9 @@ export const router = createBrowserRouter([
       { path: '/patient/triage-history', element: <TriageHistory /> },
       { path: '/patient/insurance', element: <PatientInsuranceRequests /> },
       { path: '/patient/support-tickets', element: <PatientSupportTickets /> },
-      { path: '/patient/follow-ups', element: <PatientFollowUps /> },
       { path: '/patient/health-logs', element: <PatientHealthLogs /> },
       { path: '/patient/consultation-history', element: <PatientConsultationHistory /> },
-      { path: '/profile', element: <ViewProfile /> },
-      { path: '/profile/edit', element: <UpdateProfile /> },
+      { path: '/patient/messages', element: <MessagesPage /> },
     ],
   },
 
@@ -160,10 +169,9 @@ export const router = createBrowserRouter([
       { path: '/doctor/time-slots', element: <MyTimeSlots /> },
       { path: '/doctor/insurance', element: <DoctorInsurance /> },
       { path: '/doctor/triage-escalated', element: <EscalatedTriage /> },
-      { path: '/doctor/follow-ups', element: <DoctorFollowUps /> },
       { path: '/doctor/patient-timeline', element: <DoctorPatientTimeline /> },
-      { path: '/profile', element: <ViewProfile /> },
-      { path: '/profile/edit', element: <UpdateProfile /> },
+      { path: '/doctor/pharmacy-orders', element: <DoctorPharmacyOrders /> },
+      { path: '/doctor/messages', element: <MessagesPage /> },
     ],
   },
 
@@ -185,15 +193,13 @@ export const router = createBrowserRouter([
       { path: '/admin/doctor-subscriptions', element: <AdminDoctorSubscriptions /> },
       { path: '/admin/doctor-time-slots', element: <AdminDoctorTimeSlots /> },
       { path: '/admin/insurance', element: <AdminInsurance /> },
+      { path: '/admin/support-tickets', element: <AdminSupportTickets /> },
+      { path: '/admin/messages', element: <MessagesPage /> },
       { path: '/admin/questions', element: <AdminQuestions /> },
-      { path: '/admin/passwords', element: <AdminPasswords /> },
       { path: '/admin/database', element: <DatabaseAdmin /> },
       { path: '/admin/triage-sessions', element: <TriageSessions /> },
       { path: '/admin/triage-rules', element: <TriageRules /> },
-      { path: '/admin/follow-ups', element: <AdminFollowUps /> },
       { path: '/admin/consultation-history', element: <AdminConsultationHistory /> },
-      { path: '/profile', element: <ViewProfile /> },
-      { path: '/profile/edit', element: <UpdateProfile /> },
     ],
   },
 ]);

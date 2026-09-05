@@ -14,3 +14,6 @@ export const updatePrescription = (id, data) =>
 
 export const deletePrescription = (id) =>
   apiClient.delete(`/prescriptions/${id}`);
+
+export const requestRefill = (id) =>
+  apiClient.post(`/patient/prescriptions/${id}/refill`);

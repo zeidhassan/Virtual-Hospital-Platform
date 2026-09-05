@@ -1,19 +1,22 @@
 import apiClient from './client';
 
-export const getAppointments = (params = {}) =>
-  apiClient.get('/appointments', { params });
-
 export const getMyAppointments = (params = {}) =>
-  apiClient.get('/patient/appointments', { params });
+  apiClient.get('/patient/appointments/my-appointments', { params });
 
 export const getDoctorAppointments = (params = {}) =>
   apiClient.get('/doctor/appointments', { params });
+
+export const createDoctorAppointment = (data) =>
+  apiClient.post('/doctor/appointments', data);
 
 export const bookAppointment = (data) =>
   apiClient.post('/patient/appointments', data);
 
 export const updateAppointmentStatus = (id, data) =>
   apiClient.put(`/doctor/appointments/${id}/status`, data);
+
+export const rescheduleDoctorAppointment = (id, data) =>
+  apiClient.put(`/doctor/appointments/${id}/reschedule`, data);
 
 export const cancelAppointment = (id) =>
   apiClient.put(`/patient/appointments/cancel/${id}`);

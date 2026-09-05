@@ -6,18 +6,73 @@ const VALID_STATUSES = ['pending', 'processing', 'dispatched', 'delivered', 'can
 exports.getAllOrders = async (req, res) => {
   try {
     const { patient, status } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
 
+    if (req.user.role === 'doctor') {
+      const doctorRes = await db.query('SELECT id FROM doctors WHERE user_id = $1', [req.user.id]);
+      if (doctorRes.rows.length === 0) {
+        return res.status(404).json({ error: 'Doctor not found.' });
+      }
+      const doctorId = doctorRes.rows[0].id;
+
+      const params = [doctorId];
+      const conditions = [
+        `po.patient_id IN (SELECT DISTINCT patient_id FROM appointments WHERE doctor_id = $1)`,
+      ];
+
+      if (patient) {
+        params.push(`%${patient.toLowerCase()}%`);
+        conditions.push(`LOWER(puser.full_name) LIKE $${params.length}`);
+      }
+      if (status) {
+        params.push(status);
+        conditions.push(`po.status = $${params.length}`);
+      }
+
+      const where = `WHERE ${conditions.join(' AND ')}`;
+
+      const countRes = await db.query(`
+        SELECT COUNT(*) FROM pharmacy_orders po
+        JOIN patients p ON po.patient_id = p.id
+        JOIN users puser ON p.user_id = puser.id
+        ${where}
+      `, params);
+
+      const dataRes = await db.query(`
+        SELECT po.*, puser.full_name AS patient_name,
+               po.prescription_file AS prescription_file_url
+        FROM pharmacy_orders po
+        JOIN patients p ON po.patient_id = p.id
+        JOIN users puser ON p.user_id = puser.id
+        ${where}
+        ORDER BY po.ordered_at DESC
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+      `, [...params, limit, offset]);
+
+      const total = parseInt(countRes.rows[0].count);
+      return res.json({
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+        pageSize: limit,
+        totalItems: total,
+        data: dataRes.rows,
+      });
+    }
+
+    // Admin: all orders
     const result = await paginate({
       table: 'pharmacy_orders po',
-      page: parseInt(req.query.page) || 1,
-      limit: parseInt(req.query.limit) || 10,
+      page,
+      limit,
       sort: req.query.sort || '-ordered_at',
       sortTable: 'po',
       join: `
         JOIN patients p ON po.patient_id = p.id
         JOIN users puser ON p.user_id = puser.id
       `,
-      select: `po.*, puser.full_name AS patient_name`,
+      select: `po.*, puser.full_name AS patient_name, po.prescription_file AS prescription_file_url`,
       filters: {
         'puser.full_name': patient || undefined,
         'po.status': status || undefined,
@@ -36,7 +91,8 @@ exports.getOrderById = async (req, res) => {
     const { orderId } = req.params;
 
     const result = await db.query(`
-      SELECT po.*, puser.full_name AS patient_name
+      SELECT po.*, puser.full_name AS patient_name,
+             po.prescription_file AS prescription_file_url
       FROM pharmacy_orders po
       JOIN patients p ON po.patient_id = p.id
       JOIN users puser ON p.user_id = puser.id
@@ -49,10 +105,21 @@ exports.getOrderById = async (req, res) => {
 
     const order = result.rows[0];
 
-    // Patient can only view own orders
+    // Patient can only view own orders; a doctor can only view orders for
+    // patients they're linked to (same scoping as getAllOrders' doctor branch).
     if (req.user.role === 'patient') {
       const patientRes = await db.query('SELECT id FROM patients WHERE user_id = $1', [req.user.id]);
       if (patientRes.rows.length === 0 || patientRes.rows[0].id !== order.patient_id) {
+        return res.status(403).json({ error: 'Access denied.' });
+      }
+    } else if (req.user.role === 'doctor') {
+      const linkRes = await db.query(
+        `SELECT 1 FROM doctors d
+         JOIN appointments a ON a.doctor_id = d.id
+         WHERE d.user_id = $1 AND a.patient_id = $2 LIMIT 1`,
+        [req.user.id, order.patient_id]
+      );
+      if (linkRes.rows.length === 0) {
         return res.status(403).json({ error: 'Access denied.' });
       }
     }
@@ -146,9 +213,12 @@ exports.createOrder = async (req, res) => {
       return res.status(400).json({ error: 'No valid medications found' });
     }
 
-    const requiresPrescription = medsResult.rows.some(m => m.type === 'prescription');
-    if (requiresPrescription && !req.file) {
-      return res.status(400).json({ error: 'Prescription file must be uploaded for prescription medications.' });
+    // Prescription-only medications are no longer sold through the pharmacy's
+    // self-order flow — a patient obtains those exclusively as a refill against
+    // an existing prescription, from the Prescriptions page.
+    const rxItems = medsResult.rows.filter(m => m.type === 'prescription');
+    if (rxItems.length > 0) {
+      return res.status(400).json({ error: `${rxItems.map(m => m.name).join(', ')} require a doctor's prescription and can only be ordered as a refill from your Prescriptions page.` });
     }
 
     const medsMap = {};

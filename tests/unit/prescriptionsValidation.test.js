@@ -1,4 +1,4 @@
-const { validateAddPrescription } = require('../../src/validators/prescriptionsValidation');
+const { validateDoctorPrescription } = require('../../src/validators/prescriptionsValidation');
 const { validationResult } = require('express-validator');
 
 describe('Prescription Validation', () => {
@@ -13,7 +13,7 @@ describe('Prescription Validation', () => {
 
     const next = jest.fn();
 
-    for (const middleware of validateAddPrescription) {
+    for (const middleware of validateDoctorPrescription) {
       await middleware(req, res, next);
     }
 
@@ -27,8 +27,7 @@ describe('Prescription Validation', () => {
   it('should pass with valid data', async () => {
     const req = {
       body: {
-        appointment_id: 123,
-        medication: 'Paracetamol',
+        medication_id: 1,
         dosage: '500mg',
         instructions: 'Take after meals',
         issued_date: '2025-12-31'
@@ -38,7 +37,7 @@ describe('Prescription Validation', () => {
     const res = {};
     const next = jest.fn();
 
-    for (const middleware of validateAddPrescription) {
+    for (const middleware of validateDoctorPrescription) {
       await middleware(req, res, next);
     }
 

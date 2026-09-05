@@ -1,5 +1,6 @@
 const pool = require('../../config/db');
 const { v4: uuidv4 } = require('uuid');
+const paginate = require('../../utils/pagination');
 const notificationsController = require('../databaseAdminBoard/notificationsController');
 
 const FPX_BANKS = {
@@ -32,18 +33,27 @@ exports.getMyBills = async (req, res) => {
     if (patRes.rows.length === 0) return res.status(403).json({ error: 'Patient record not found' });
     const patientId = patRes.rows[0].id;
 
-    const result = await pool.query(
-      `SELECT b.*,
+    const result = await paginate({
+      table: 'bills b',
+      page: parseInt(req.query.page) || 1,
+      limit: parseInt(req.query.limit) || 10,
+      sort: req.query.sort || '-billing_date',
+      sortTable: 'b',
+      select: `b.*,
         (SELECT row_to_json(t) FROM (
           SELECT transaction_ref, method_type, fpx_bank, created_at
           FROM payment_transactions WHERE bill_id = b.id ORDER BY created_at DESC LIMIT 1
-        ) t) AS last_transaction
-       FROM bills b WHERE b.patient_id = $1 ORDER BY b.billing_date DESC`,
-      [patientId]
-    );
-    res.json({ data: result.rows, total: result.rowCount });
+        ) t) AS last_transaction`,
+      filters: {
+        'b.patient_id': patientId,
+        'b.status': req.query.status || undefined,
+      },
+    });
+
+    res.json(result);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };
 
@@ -99,7 +109,8 @@ exports.payBill = async (req, res) => {
 
     res.json({ success: true, transaction_ref: txRef, message: 'Payment successful' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };
 
@@ -116,6 +127,7 @@ exports.getMyTransactions = async (req, res) => {
     );
     res.json({ data: result.rows });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };

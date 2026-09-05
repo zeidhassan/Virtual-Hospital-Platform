@@ -1,3 +1,9 @@
+// verifyToken reads JWT_SECRET at module-load time and (correctly, as of
+// this fix) no longer falls back to a hardcoded default — so this unit test
+// must not depend on some other test file having already loaded dotenv and
+// left JWT_SECRET set as a process-wide side effect.
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret';
+
 const jwt = require('jsonwebtoken');
 const verifyToken = require('../../src/middleware/verifyToken');
 const requireRole = require('../../src/middleware/requireRole');

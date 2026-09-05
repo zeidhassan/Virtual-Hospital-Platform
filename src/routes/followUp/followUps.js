@@ -10,6 +10,7 @@ router.use(verifyToken);
 router.post('/process-reminders', requireRole('admin'), ctrl.processReminders);
 router.post('/process-missed',    requireRole('admin'), ctrl.processMissed);
 router.get('/admin',              requireRole('admin'), ctrl.getAllFollowUps);
+router.put('/:id/assign',         requireRole('admin'), ctrl.assignFollowUp);
 
 // Doctor or admin creates
 router.post('/', requireRole(['doctor', 'admin']), ctrl.createFollowUp);
@@ -25,5 +26,8 @@ router.put('/:id/complete', requireRole(['patient', 'doctor', 'admin']), ctrl.co
 
 // Doctor or admin cancels
 router.put('/:id/cancel', requireRole(['doctor', 'admin']), ctrl.cancelFollowUp);
+
+// Doctor or admin reschedules
+router.put('/:id/reschedule', requireRole(['doctor', 'admin']), ctrl.rescheduleFollowUp);
 
 module.exports = router;

@@ -3,6 +3,9 @@ const handleDbError = require('../../utils/handleDbError');
 const paginate = require('../../utils/pagination'); // Pagination utility
 const bcrypt = require('bcryptjs');
 
+// Never return password_hash to the admin UI, even though nothing displays it.
+const PUBLIC_COLUMNS = 'id, full_name, email, role, phone, gender, date_of_birth, profile_picture_url, login_attempts, locked_until, created_at, updated_at';
+
 // GET all users (admin only)
 exports.getAllUsers = async (req, res) => {
   try {
@@ -20,6 +23,9 @@ exports.getAllUsers = async (req, res) => {
       "phone",
       "gender",
       "date_of_birth",
+      "profile_picture_url",
+      "login_attempts",
+      "locked_until",
       "created_at",
       "updated_at"
     ];
@@ -36,7 +42,8 @@ exports.getAllUsers = async (req, res) => {
       page,
       limit,
       sort,
-      filters
+      filters,
+      select: PUBLIC_COLUMNS
     });
 
     res.json(result); 
@@ -53,7 +60,7 @@ exports.getUserById = async (req, res) => {
       return res.status(403).json({ error: 'Access denied: Admins only.' });
     }
 
-    const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.params.id]);
+    const result = await pool.query(`SELECT ${PUBLIC_COLUMNS} FROM users WHERE id = $1`, [req.params.id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -71,7 +78,7 @@ exports.createUser = async (req, res) => {
       return res.status(403).json({ error: 'Only admins can create users.' });
     }
 
-    const { full_name, email, password, role, phone, gender, date_of_birth } = req.body;
+    const { full_name, email, password, role, phone, gender, date_of_birth, profile_picture_url } = req.body;
 
     if (!full_name || !email || !password || !role) {
       return res.status(400).json({ error: 'Missing required fields: full_name, email, password, role' });
@@ -82,15 +89,9 @@ exports.createUser = async (req, res) => {
 
     // Insert into users table
     const result = await pool.query(
-      `INSERT INTO users (full_name, email, password_hash, role, phone, gender, date_of_birth)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [full_name, email, password_hash, role, phone, gender, date_of_birth]
-    );
-
-    // Insert into user_passwords table
-    await pool.query(
-      `INSERT INTO user_passwords (email, password) VALUES ($1, $2)`,
-      [email, password]
+      `INSERT INTO users (full_name, email, password_hash, role, phone, gender, date_of_birth, profile_picture_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING ${PUBLIC_COLUMNS}`,
+      [full_name, email, password_hash, role, phone, gender, date_of_birth, profile_picture_url]
     );
 
     res.status(201).json(result.rows[0]);
@@ -106,19 +107,20 @@ exports.updateUser = async (req, res) => {
       return res.status(403).json({ error: 'Only admins can update users.' });
     }
 
-    const { full_name, email, role, phone, gender, date_of_birth, password } = req.body;
+    const { full_name, email, role, phone, gender, date_of_birth, password, profile_picture_url, login_attempts, locked_until } = req.body;
 
     let query = `
       UPDATE users
-      SET full_name=$1, email=$2, role=$3, phone=$4, gender=$5, date_of_birth=$6, updated_at=NOW()`;
-    const values = [full_name, email, role, phone, gender, date_of_birth];
+      SET full_name=$1, email=$2, role=$3, phone=$4, gender=$5, date_of_birth=$6,
+          profile_picture_url=$7, login_attempts=$8, locked_until=$9, updated_at=NOW()`;
+    const values = [full_name, email, role, phone, gender, date_of_birth, profile_picture_url, login_attempts, locked_until];
 
     if (password) {
       const password_hash = await bcrypt.hash(password, 10);
-      query += `, password_hash=$7 WHERE id=$8 RETURNING *`;
+      query += `, password_hash=$10 WHERE id=$11 RETURNING ${PUBLIC_COLUMNS}`;
       values.push(password_hash, req.params.id);
     } else {
-      query += ` WHERE id=$7 RETURNING *`;
+      query += ` WHERE id=$10 RETURNING ${PUBLIC_COLUMNS}`;
       values.push(req.params.id);
     }
 
@@ -126,14 +128,6 @@ exports.updateUser = async (req, res) => {
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
-    }
-
-    // If password was updated, update user_passwords table as well
-    if (password) {
-      await pool.query(
-        `UPDATE user_passwords SET password = $1 WHERE email = $2`,
-        [password, email]
-      );
     }
 
     res.json(result.rows[0]);
@@ -163,9 +157,6 @@ exports.deleteUser = async (req, res) => {
 // UPDATE own user (all can access)
 exports.updateOwnProfile = async (req, res) => {
   try {
-    console.log('[DEBUG] Authenticated user ID:', req.user.id);
-    console.log('[DEBUG] Request body:', req.body);
-
     const userId = req.user.id;
     const { password, phone, gender, date_of_birth } = req.body;
 
@@ -173,10 +164,7 @@ exports.updateOwnProfile = async (req, res) => {
     const values = [];
     let i = 1;
 
-    let plainPassword = null;
-
     if (password) {
-      plainPassword = password;
       const hashed = await bcrypt.hash(password, 10);
       updates.push(`password_hash = $${i++}`);
       values.push(hashed);
@@ -205,15 +193,6 @@ exports.updateOwnProfile = async (req, res) => {
     values.push(userId);
 
     const result = await pool.query(query, values);
-
-    // Update plain password in user_passwords table too
-    if (plainPassword) {
-      const email = result.rows[0].email;
-      await pool.query(
-        `UPDATE user_passwords SET password = $1 WHERE email = $2`,
-        [plainPassword, email]
-      );
-    }
 
     res.json({ message: 'Profile updated', user: result.rows[0] });
 

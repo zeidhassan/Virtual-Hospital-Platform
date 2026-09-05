@@ -3,6 +3,7 @@ const router = express.Router();
 const controller = require('../../controllers/patient/patientController');
 const verifyToken = require('../../middleware/verifyToken');
 const requireRole = require('../../middleware/requireRole');
+const { uploadMedicalRecord, wrapUpload } = require('../../middleware/uploadMiddleware');
 
 // Global token verification
 router.use(verifyToken);
@@ -108,6 +109,7 @@ router.get('/doctor-details/:doctorId', requireRole('patient'), controller.getDo
  *                 $ref: '#/components/schemas/Prescription'
  */
 router.get('/prescriptions', requireRole('patient'), controller.getPrescriptions);
+router.post('/prescriptions/:id/refill', requireRole('patient'), controller.requestRefill);
 /**
  * @swagger
  * /api/patient/all-medications:
@@ -172,6 +174,7 @@ router.get('/medication-details/:id', requireRole('patient'), controller.getMedi
  *                 $ref: '#/components/schemas/MedicalRecord'
  */
 router.get('/records', requireRole('patient'), controller.getMedicalRecords);
+router.post('/records', requireRole('patient'), wrapUpload(uploadMedicalRecord, 'medical_record_file'), controller.uploadMedicalRecord);
 
 /**
  * @swagger

@@ -95,10 +95,11 @@ exports.getTimeline = async (req, res) => {
             'appointment_start_time', appointment_start_time,
             'appointment_end_time', appointment_end_time,
             'notes', notes,
-            'doctor_id', doctor_id
+            'doctor_id', doctor_id,
+            'appointment_type', appointment_type
           ) AS details
         FROM appointments
-        WHERE patient_id = $${p}${dateFilter('appointment_date::timestamp')}
+        WHERE patient_id = $${p} AND appointment_type IN ('consultation', 'triage_escalation')${dateFilter('appointment_date::timestamp')}
       `);
     }
 
@@ -106,9 +107,9 @@ exports.getTimeline = async (req, res) => {
       const p = addParam(patientId);
       parts.push(`
         SELECT 'prescription' AS type, pr.id, (pr.issued_date::timestamp) AS date,
-          pr.medication AS summary,
+          m.name AS summary,
           jsonb_build_object(
-            'medication', pr.medication,
+            'medication', m.name,
             'dosage', pr.dosage,
             'pack_limit', pr.pack_limit,
             'instructions', pr.instructions,
@@ -116,6 +117,7 @@ exports.getTimeline = async (req, res) => {
           ) AS details
         FROM prescriptions pr
         JOIN appointments a ON pr.appointment_id = a.id
+        JOIN medications m ON pr.medication_id = m.id
         WHERE a.patient_id = $${p}${dateFilter('pr.issued_date::timestamp')}
       `);
     }
@@ -138,17 +140,17 @@ exports.getTimeline = async (req, res) => {
     if (requestedTypes.includes('follow_up')) {
       const p = addParam(patientId);
       parts.push(`
-        SELECT 'follow_up' AS type, id, (scheduled_date::timestamp) AS date,
+        SELECT 'follow_up' AS type, id, (appointment_date::timestamp) AS date,
           COALESCE(notes, status) AS summary,
           jsonb_build_object(
             'status', status,
             'notes', notes,
-            'scheduled_date', scheduled_date,
+            'scheduled_date', appointment_date,
             'doctor_id', doctor_id,
             'reminder_sent', reminder_sent
           ) AS details
-        FROM follow_up_schedules
-        WHERE patient_id = $${p}${dateFilter('scheduled_date::timestamp')}
+        FROM appointments
+        WHERE patient_id = $${p} AND appointment_type = 'follow_up'${dateFilter('appointment_date::timestamp')}
       `);
     }
 
@@ -177,8 +179,13 @@ exports.getTimeline = async (req, res) => {
 
     const limitParam  = addParam(limit);
     const offsetParam = addParam(offset);
+    // type/id break ties deterministically when multiple entries share the
+    // same timestamp (e.g. a batch of auto-created follow-ups) — without a
+    // tiebreaker, LIMIT/OFFSET pagination over tied rows isn't guaranteed to
+    // return a stable order, so the same row can reappear or get skipped
+    // across pages.
     const dataResult = await pool.query(
-      `SELECT * FROM (${union}) AS t ORDER BY date DESC NULLS LAST LIMIT $${limitParam} OFFSET $${offsetParam}`,
+      `SELECT * FROM (${union}) AS t ORDER BY date DESC NULLS LAST, type, id LIMIT $${limitParam} OFFSET $${offsetParam}`,
       params
     );
 
@@ -186,9 +193,10 @@ exports.getTimeline = async (req, res) => {
       if (row.type === 'prescription' && row.details) {
         return {
           ...row,
+          // Only instructions is ever encrypted — medication is a plain
+          // medications.name lookup, never ciphertext.
           details: {
             ...row.details,
-            medication:   decrypt(row.details.medication),
             instructions: decrypt(row.details.instructions),
           },
         };
@@ -198,7 +206,8 @@ exports.getTimeline = async (req, res) => {
 
     res.json({ data, total, limit, offset });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };
 
@@ -214,13 +223,13 @@ exports.getSummary = async (req, res) => {
 
     const [triage, appointments, prescriptions, medRecords, followUps, healthLogs] = await Promise.all([
       pool.query('SELECT COUNT(*) FROM triage_sessions WHERE patient_id = $1', [patientId]),
-      pool.query('SELECT COUNT(*) FROM appointments WHERE patient_id = $1', [patientId]),
+      pool.query("SELECT COUNT(*) FROM appointments WHERE patient_id = $1 AND appointment_type IN ('consultation', 'triage_escalation')", [patientId]),
       pool.query(
         'SELECT COUNT(*) FROM prescriptions pr JOIN appointments a ON pr.appointment_id = a.id WHERE a.patient_id = $1',
         [patientId]
       ),
       pool.query('SELECT COUNT(*) FROM medical_records WHERE patient_id = $1', [patientId]),
-      pool.query('SELECT COUNT(*) FROM follow_up_schedules WHERE patient_id = $1', [patientId]),
+      pool.query("SELECT COUNT(*) FROM appointments WHERE patient_id = $1 AND appointment_type = 'follow_up'", [patientId]),
       pool.query('SELECT COUNT(*) FROM health_logs WHERE patient_id = $1', [patientId]),
     ]);
 
@@ -233,6 +242,7 @@ exports.getSummary = async (req, res) => {
       health_logs:     parseInt(healthLogs.rows[0].count),
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };

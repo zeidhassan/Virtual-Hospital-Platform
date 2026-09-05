@@ -1,6 +1,13 @@
 const pool = require('../../config/db'); // PostgreSQL connection pool
 const handleDbError = require('../../utils/handleDbError');
 const paginate = require('../../utils/pagination'); // Pagination utility
+const { encrypt, decrypt } = require('../../utils/encrypt');
+
+// description is stored encrypted (matching every other controller that
+// writes/reads this column) — the generic board previously read/wrote it as
+// plain text, which corrupted the field for every other reader and crashed
+// decrypt() the next time a real controller tried to read the record.
+const decryptRecord = (row) => (row ? { ...row, description: decrypt(row.description) } : row);
 
 // GET all medical records (admin only)
 exports.getAllMedicalRecords = async (req, res) => {
@@ -36,7 +43,7 @@ exports.getAllMedicalRecords = async (req, res) => {
       filters
     });
 
-    res.json(result);
+    res.json({ ...result, data: result.data.map(decryptRecord) });
   } catch (err) {
     console.error('Pagination error:', err.message);
     res.status(400).json({ error: 'Pagination failed: ' + err.message });
@@ -56,7 +63,7 @@ exports.getMedicalRecordById = async (req, res) => {
       return res.status(404).json({ error: 'Medical record not found' });
     }
 
-    res.json(result.rows[0]);
+    res.json(decryptRecord(result.rows[0]));
   } catch (err) {
     return handleDbError(err, res);
   }
@@ -74,10 +81,10 @@ exports.createMedicalRecord = async (req, res) => {
     const result = await pool.query(
       `INSERT INTO medical_records (patient_id, doctor_id, appointment_id, record_type, description, file_url, created_at, private)
        VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7) RETURNING *`,
-      [patient_id, doctor_id, appointment_id, record_type, description, file_url, isPrivate]
+      [patient_id, doctor_id, appointment_id, record_type, encrypt(description), file_url, isPrivate]
     );
 
-    res.status(201).json(result.rows[0]);
+    res.status(201).json(decryptRecord(result.rows[0]));
   } catch (err) {
     return handleDbError(err, res);
   }
@@ -89,21 +96,21 @@ exports.updateMedicalRecord = async (req, res) => {
     return res.status(403).json({ error: 'Only admins can update medical records.' });
   }
 
-  const { record_type, description, file_url } = req.body;
+  const { record_type, description, file_url, private: isPrivate } = req.body;
 
   try {
     const result = await pool.query(
-      `UPDATE medical_records 
-       SET record_type=$1, description=$2, file_url=$3
-       WHERE id=$4 RETURNING *`,
-      [record_type, description, file_url, req.params.id]
+      `UPDATE medical_records
+       SET record_type=$1, description=$2, file_url=$3, private=$4
+       WHERE id=$5 RETURNING *`,
+      [record_type, encrypt(description), file_url, isPrivate, req.params.id]
     );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Medical record not found' });
     }
 
-    res.json(result.rows[0]);
+    res.json(decryptRecord(result.rows[0]));
   } catch (err) {
     return handleDbError(err, res);
   }

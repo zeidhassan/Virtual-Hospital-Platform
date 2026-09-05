@@ -6,7 +6,8 @@ exports.getUsersByRole = async (req, res) => {
     const result = await db.query('SELECT role, COUNT(*) AS count FROM users GROUP BY role');
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };
 
@@ -35,7 +36,25 @@ exports.getAppointmentsStats = async (req, res) => {
     const result = await db.query(query, values);
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
+  }
+};
+
+// 2b. Appointment volume trend, last 6 months (for dashboard bar chart)
+exports.getAppointmentsMonthlyTrend = async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT DATE_TRUNC('month', appointment_date) AS month, COUNT(*) AS count
+      FROM appointments
+      WHERE appointment_date >= DATE_TRUNC('month', NOW()) - INTERVAL '5 months'
+      GROUP BY month
+      ORDER BY month ASC
+    `);
+    res.json(result.rows.map(r => ({ month: r.month, count: parseInt(r.count) })));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };
 
@@ -53,7 +72,8 @@ exports.getPrescriptionsStats = async (req, res) => {
     `);
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };
 
@@ -64,7 +84,8 @@ exports.getPharmacyOrdersStats = async (req, res) => {
     const result = await db.query('SELECT status, COUNT(*) AS count FROM pharmacy_orders GROUP BY status');
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };
 
@@ -89,7 +110,8 @@ exports.getRevenueStats = async (req, res) => {
 
     res.json({ monthly: monthly.rows, yearly: yearly.rows });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };
 
@@ -104,6 +126,7 @@ exports.getSubscriptionsStats = async (req, res) => {
     `);
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };

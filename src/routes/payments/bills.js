@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { createBill, getBillsByPatient, updateBillStatus, deleteBill } = require('../../controllers/payments/billsController');
+const { createBill, updateBillStatus, deleteBill } = require('../../controllers/payments/billsController');
 
 const requireRole = require('../../middleware/requireRole');
 const verifyToken = require('../../middleware/verifyToken')
@@ -34,27 +34,9 @@ router.use(verifyToken);
  */
 router.post('/', requireRole(['doctor', 'admin']), createBill);
 
-// View bills for a patient (anyone; access check inside controller)
-/**
- * @swagger
- * /api/payments/bills/patient/{id}:
- *   get:
- *     summary: Get all bills for a specific patient
- *     tags: [Bills]
- *     parameters:
- *       - in: path
- *         name: id
- *         schema:
- *           type: integer
- *         required: true
- *         description: Patient ID
- *     responses:
- *       200:
- *         description: List of bills
- *       403:
- *         description: Access denied
- */
-router.get('/patient/:id', getBillsByPatient);
+// A patient's own bills are served by the correctly-scoped
+// GET /api/payments/bills/my (paymentsController.getMyBills), which derives
+// the caller's patient_id from the JWT instead of trusting a URL/header value.
 
 // Update bill status (Admin or Doctor)
 /**

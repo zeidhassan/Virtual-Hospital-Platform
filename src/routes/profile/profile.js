@@ -1,7 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const verifyToken = require('../../middleware/verifyToken');
+const { uploadProfilePicture, wrapUpload } = require('../../middleware/uploadMiddleware');
 const ctrl = require('../../controllers/profile/profileController'); // adjust path
+
+// The frontend calls the bare collection path (GET/PATCH /api/profile); keep
+// /me and /update-profile too since they're already documented via Swagger.
+router.get('/', verifyToken, ctrl.getMyProfile);
+router.patch('/', verifyToken, ctrl.updateProfile);
+router.patch('/picture', verifyToken, wrapUpload(uploadProfilePicture, 'profile_picture'), ctrl.uploadProfilePicture);
+
 /**
  * @swagger
  * /profile/me:

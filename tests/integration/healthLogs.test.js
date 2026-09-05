@@ -8,8 +8,8 @@ describe('Health Logs API (Section 7.9–7.11)', () => {
 
   beforeAll(async () => {
     const [patientRes, doctorRes] = await Promise.all([
-      request(app).post('/api/auth/login').send({ email: 'jane@helixacare.com', password: 'patient123' }),
-      request(app).post('/api/auth/login').send({ email: 'strange@helixacare.com', password: 'doctor123' }),
+      request(app).post('/api/auth/login').send({ email: 'jane@helixacare.com', password: 'admin123' }),
+      request(app).post('/api/auth/login').send({ email: 'strange@helixacare.com', password: 'admin123' }),
     ]);
     patientToken = patientRes.body.token;
     doctorToken  = doctorRes.body.token;
@@ -20,7 +20,6 @@ describe('Health Logs API (Section 7.9–7.11)', () => {
 
   afterAll(async () => {
     await pool.query('DELETE FROM health_logs WHERE notes LIKE $1', ['%integration test%']);
-    await pool.end();
   });
 
   // 7.9 — Patient submits health logs

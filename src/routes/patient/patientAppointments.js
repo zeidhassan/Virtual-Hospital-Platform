@@ -92,7 +92,9 @@ router.post('/', patientAppointmentsController.createAppointment);
  *       500:
  *         description: Server error
  */
-router.post('/:appointmentId/buy', patientAppointmentsController.buyMedication);
+// buyMedication (legacy, pre-dated the pharmacy/prescription rework) was
+// removed — unused by the frontend, and superseded by
+// POST /api/pharmacy-orders and POST /api/patient/prescriptions/:id/refill.
 
 // Get all specializations
 /**
@@ -172,8 +174,8 @@ router.get('/doctor-time-slots/:doctorId', patientAppointmentsController.getDoct
  */
 router.get('/my-appointments', patientAppointmentsController.getPatientAppointments);
 
-// NEW Get prescribed medications
-router.get('/prescribed-medications/:appointmentId', patientAppointmentsController.getPrescribedMedications);
+// getPrescribedMedications (legacy) was removed — unused by the frontend,
+// and superseded by GET /api/patient/prescriptions.
 
 //NEW Get public medical records
 router.get('/medical-records/:appointmentId', patientAppointmentsController.viewMedicalRecords);

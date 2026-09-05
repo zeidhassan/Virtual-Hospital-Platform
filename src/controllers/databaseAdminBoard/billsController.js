@@ -15,7 +15,9 @@ exports.getAllBills = async (req, res) => {
       "amount",
       "status",
       "billing_date",
-      "details"
+      "details",
+      "currency",
+      "pharmacy_order_id"
     ];
 
     const filters = {};
@@ -64,13 +66,13 @@ exports.createBill = async (req, res) => {
     return res.status(403).json({ error: 'Only admins can create bills.' });
   }
 
-  const { patient_id, amount, status, billing_date, details } = req.body;
+  const { patient_id, amount, status, billing_date, details, currency, pharmacy_order_id } = req.body;
 
   try {
     const result = await pool.query(
-      `INSERT INTO bills (patient_id, amount, status, billing_date, details)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [patient_id, amount, status, billing_date, details]
+      `INSERT INTO bills (patient_id, amount, status, billing_date, details, currency, pharmacy_order_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [patient_id, amount, status, billing_date, details, currency, pharmacy_order_id]
     );
 
     res.status(201).json(result.rows[0]);
@@ -85,14 +87,14 @@ exports.updateBill = async (req, res) => {
     return res.status(403).json({ error: 'Only admins can update bills.' });
   }
 
-  const { amount, status, billing_date, details } = req.body;
+  const { amount, status, billing_date, details, currency, pharmacy_order_id } = req.body;
 
   try {
     const result = await pool.query(
-      `UPDATE bills 
-       SET amount=$1, status=$2, billing_date=$3, details=$4
-       WHERE id=$5 RETURNING *`,
-      [amount, status, billing_date, details, req.params.id]
+      `UPDATE bills
+       SET amount=$1, status=$2, billing_date=$3, details=$4, currency=$5, pharmacy_order_id=$6
+       WHERE id=$7 RETURNING *`,
+      [amount, status, billing_date, details, currency, pharmacy_order_id, req.params.id]
     );
 
     if (result.rows.length === 0) {

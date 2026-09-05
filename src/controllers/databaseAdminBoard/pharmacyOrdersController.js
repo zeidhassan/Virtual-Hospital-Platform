@@ -12,10 +12,16 @@ exports.getAllPharmacyOrders = async (req, res) => {
     const validColumns = [
       "id",
       "patient_id",
+      "prescription_id",
       "medications",
+      "quantities",
       "total_amount",
+      "currency",
       "status",
       "prescription_file",
+      "delivery_address",
+      "payment_method",
+      "insurance_request_id",
       "ordered_at"
     ];
 
@@ -65,13 +71,13 @@ exports.createPharmacyOrder = async (req, res) => {
     return res.status(403).json({ error: 'Only admins can create pharmacy orders.' });
   }
 
-  const { patient_id, medications, total_amount, status, ordered_at } = req.body;
+  const { patient_id, prescription_id, medications, quantities, total_amount, currency, status, prescription_file, delivery_address, payment_method, insurance_request_id } = req.body;
 
   try {
     const result = await pool.query(
-      `INSERT INTO pharmacy_orders (patient_id, medications, total_amount, status, ordered_at)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [patient_id, medications, total_amount, status, ordered_at]
+      `INSERT INTO pharmacy_orders (patient_id, prescription_id, medications, quantities, total_amount, currency, status, prescription_file, delivery_address, payment_method, insurance_request_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      [patient_id, prescription_id, medications, quantities, total_amount, currency, status, prescription_file, delivery_address, payment_method, insurance_request_id]
     );
 
     res.status(201).json(result.rows[0]);
@@ -86,14 +92,14 @@ exports.updatePharmacyOrder = async (req, res) => {
     return res.status(403).json({ error: 'Only admins can update pharmacy orders.' });
   }
 
-  const { medications, total_amount, status, ordered_at } = req.body;
+  const { prescription_id, medications, quantities, total_amount, currency, status, prescription_file, delivery_address, payment_method, insurance_request_id } = req.body;
 
   try {
     const result = await pool.query(
-      `UPDATE pharmacy_orders 
-       SET medications=$1, total_amount=$2, status=$3, ordered_at=$4
-       WHERE id=$5 RETURNING *`,
-      [medications, total_amount, status, ordered_at, req.params.id]
+      `UPDATE pharmacy_orders
+       SET prescription_id=$1, medications=$2, quantities=$3, total_amount=$4, currency=$5, status=$6, prescription_file=$7, delivery_address=$8, payment_method=$9, insurance_request_id=$10
+       WHERE id=$11 RETURNING *`,
+      [prescription_id, medications, quantities, total_amount, currency, status, prescription_file, delivery_address, payment_method, insurance_request_id, req.params.id]
     );
 
     if (result.rows.length === 0) {

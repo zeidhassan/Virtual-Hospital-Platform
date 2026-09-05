@@ -20,11 +20,20 @@ describe('Encrypt/Decrypt Utils', () => {
     expect(decrypted).toBe(text);
   });
 
-  test('should return empty string if decrypt input is malformed', () => {
-    // decrypt now has a try/catch — malformed input returns '' instead of throwing
-    expect(decrypt('invalid')).toBe('');
+  test('should return empty string only for missing/empty input', () => {
     expect(decrypt(null)).toBe('');
     expect(decrypt('')).toBe('');
+  });
+
+  test('should throw on malformed or tampered ciphertext, not silently return empty', () => {
+    // AES-256-GCM is authenticated — a genuinely corrupted or non-ciphertext
+    // value must be visible as an error, not degrade into a blank field.
+    expect(() => decrypt('invalid')).toThrow();
+
+    const encrypted = encrypt('sensitive-data');
+    const [iv, authTag, cipherHex] = encrypted.split(':');
+    const tampered = `${iv}:${authTag}:${cipherHex.slice(0, -2)}00`;
+    expect(() => decrypt(tampered)).toThrow();
   });
 
   test('should throw if ENCRYPTION_KEY is not set', () => {

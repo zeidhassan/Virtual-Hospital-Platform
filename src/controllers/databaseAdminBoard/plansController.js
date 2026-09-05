@@ -56,16 +56,16 @@ exports.getPlanById = async (req, res) => {
 // Create a new plan
 exports.createPlan = async (req, res) => {
   try {
-    let { name, description, price, duration, features, currency } = req.body;
+    let { name, description, price, duration_days, features, currency } = req.body;
 
     // Basic required field check
-    if (!name || price == null || duration == null) {
-      return res.status(400).json({ error: 'name, price, and duration are required.' });
+    if (!name || price == null || duration_days == null) {
+      return res.status(400).json({ error: 'name, price, and duration_days are required.' });
     }
 
     // Coerce numbers
     const priceNum = Number(price);
-    const durationDays = parseInt(duration, 10);
+    const durationDays = parseInt(duration_days, 10);
     if (Number.isNaN(priceNum) || Number.isNaN(durationDays)) {
       return res.status(400).json({ error: 'price and duration must be numeric.' });
     }
@@ -74,7 +74,7 @@ exports.createPlan = async (req, res) => {
     const featuresArray = normalizeFeatures(features);
 
     // Fallback currency
-    const currencyCode = currency && String(currency).trim() ? currency : 'SAR';
+    const currencyCode = currency && String(currency).trim() ? currency : 'MYR';
 
     const result = await db.query(
       `INSERT INTO plans (name, description, price, duration_days, features, currency)
@@ -143,10 +143,10 @@ function cleanFeature(s) {
 // Update a plan
 exports.updatePlan = async (req, res) => {
   const id = parseInt(req.params.id);
-  const { name, description, price, duration, features, currency } = req.body;
+  const { name, description, price, duration_days, features, currency } = req.body;
 
-  if (!name || !price || !duration) {
-    return res.status(400).json({ error: 'name, price, and duration are required.' });
+  if (!name || !price || !duration_days) {
+    return res.status(400).json({ error: 'name, price, and duration_days are required.' });
   }
 
   let featuresArray = features;
@@ -162,7 +162,7 @@ exports.updatePlan = async (req, res) => {
   try {
     const result = await db.query(
       'UPDATE plans SET name = $1, description = $2, price = $3, duration_days = $4, features = $5, currency = $6 WHERE id = $7 RETURNING *',
-      [name, description, price, duration, featuresArray, currency || 'SAR', id]
+      [name, description, price, duration_days, featuresArray, currency || 'MYR', id]
     );
     res.json(result.rows[0]);
   } catch (err) {

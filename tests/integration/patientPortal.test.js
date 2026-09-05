@@ -10,7 +10,7 @@ describe('Patient Portal — Section 3', () => {
   beforeAll(async () => {
     const login = await request(app).post('/api/auth/login').send({
       email: 'jane@helixacare.com',
-      password: 'patient123',
+      password: 'admin123',
     });
     patientToken = login.body.token;
     expect(patientToken).toBeDefined();
@@ -151,7 +151,7 @@ describe('Patient Portal — Section 3', () => {
         .post('/api/pharmacy-orders')
         .set('Authorization', `Bearer ${patientToken}`)
         .query({ medications: 'Paracetamol', quantities: '1' })
-        .field('delivery_address', '123 Test Street, Riyadh')
+        .field('delivery_address', '123 Test Street, Kuala Lumpur')
         .field('payment_method', 'cash');
       expect([201, 400]).toContain(res.statusCode); // 201 if med exists, 400 if not seeded
     });
@@ -210,7 +210,7 @@ describe('Patient Portal — Section 3', () => {
         .get('/api/insurance-requests/my')
         .set('Authorization', `Bearer ${patientToken}`);
       expect(res.statusCode).toBe(200);
-      expect(Array.isArray(res.body)).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
     });
 
     it('blocks non-patient from submitting → 403', async () => {

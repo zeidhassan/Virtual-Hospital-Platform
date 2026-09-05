@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 
 // Ensure upload directories exist at startup
-['medical-records', 'prescriptions', 'support-tickets'].forEach((dir) => {
+['medical-records', 'prescriptions', 'support-tickets', 'profile-pictures', 'messages'].forEach((dir) => {
   fs.mkdirSync(path.join(__dirname, `../../uploads/${dir}`), { recursive: true });
 });
 
@@ -16,6 +16,26 @@ const fileFilter = (req, file, cb) => {
     cb(null, true);
   } else {
     cb(new Error('Invalid file type. Only PDF, JPG, and PNG are allowed.'));
+  }
+};
+
+// Profile pictures: images only, no PDFs
+const imageOnlyTypes = ['image/jpeg', 'image/png', 'image/webp'];
+const imageOnlyFilter = (req, file, cb) => {
+  if (imageOnlyTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type. Only JPG, PNG, and WEBP images are allowed.'));
+  }
+};
+
+// Prescription uploads also accept plain text files (a scanned Rx note, typed instructions, etc.)
+const prescriptionAllowedTypes = [...allowedTypes, 'text/plain'];
+const prescriptionFileFilter = (req, file, cb) => {
+  if (prescriptionAllowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type. Only PDF, JPG, PNG, and TXT are allowed.'));
   }
 };
 
@@ -42,7 +62,7 @@ const uploadMedicalRecord = multer({
 // Middleware for prescriptions
 const uploadPrescription = multer({
   storage: createStorage('prescriptions'),
-  fileFilter,
+  fileFilter: prescriptionFileFilter,
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB
 });
 
@@ -53,8 +73,33 @@ const uploadSupportTicket = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB
 });
 
+// Middleware for profile pictures
+const uploadProfilePicture = multer({
+  storage: createStorage('profile-pictures'),
+  fileFilter: imageOnlyFilter,
+  limits: { fileSize: 3 * 1024 * 1024 } // 3MB
+});
+
+// Middleware for chat message attachments
+const uploadAttachment = multer({
+  storage: createStorage('messages'),
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB
+});
+
+// Wraps a multer instance so filter/limit errors return JSON 400 instead of HTML
+const wrapUpload = (multerInstance, fieldName) => (req, res, next) => {
+  multerInstance.single(fieldName)(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
+};
+
 module.exports = {
   uploadMedicalRecord,
   uploadPrescription,
-  uploadSupportTicket
+  uploadSupportTicket,
+  uploadProfilePicture,
+  uploadAttachment,
+  wrapUpload
 };

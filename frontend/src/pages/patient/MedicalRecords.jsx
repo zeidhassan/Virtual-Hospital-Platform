@@ -1,56 +1,59 @@
-import { getMedicalRecords } from '@/api/medicalRecords';
-import useFetch from '@/hooks/useFetch';
-import Card, { CardHeader } from '@/components/ui/Card';
+import { useState } from 'react';
+import { getMedicalRecords, uploadMedicalRecord } from '@/api/medicalRecords';
+import usePaginatedFetch from '@/hooks/usePaginatedFetch';
+import Card from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+import Modal from '@/components/ui/Modal';
+import Select from '@/components/ui/Select';
 import Spinner from '@/components/ui/Spinner';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
-import { FileText, ExternalLink, FlaskConical, Heart, Scan, Syringe,
-         ClipboardList, FileCheck, Download } from 'lucide-react';
+import PageHeader from '@/components/ui/PageHeader';
+import Pagination from '@/components/ui/Pagination';
+import { FileText, ExternalLink, FlaskConical, Heart, Scan, Syringe, ClipboardList, FileCheck, Download, Plus } from 'lucide-react';
 import { format } from 'date-fns';
+import toast from 'react-hot-toast';
+import { openAuthedFile, fileNameFromPath } from '@/utils/viewFile';
 
 // Icon + colour per record type
 const TYPE_META = {
-  'medical-history':  { icon: ClipboardList, bg: 'bg-blue-100',    text: 'text-blue-600',    label: 'Medical History' },
-  'patient-profile':  { icon: FileCheck,     bg: 'bg-slate-100',   text: 'text-slate-600',   label: 'Patient Profile' },
-  'doctor-notes':     { icon: ClipboardList, bg: 'bg-purple-100',  text: 'text-purple-600',  label: 'Doctor Notes' },
-  'diagnosis':        { icon: FileText,      bg: 'bg-red-100',     text: 'text-red-600',     label: 'Diagnosis' },
-  'scan':             { icon: Scan,          bg: 'bg-cyan-100',    text: 'text-cyan-600',    label: 'Scan' },
-  'lab-result':       { icon: FlaskConical,  bg: 'bg-amber-100',   text: 'text-amber-600',   label: 'Lab Result' },
-  'xray':             { icon: Scan,          bg: 'bg-indigo-100',  text: 'text-indigo-600',  label: 'X-Ray' },
-  'blood-test':       { icon: FlaskConical,  bg: 'bg-rose-100',    text: 'text-rose-600',    label: 'Blood Test' },
-  'blood-readings':   { icon: Heart,         bg: 'bg-pink-100',    text: 'text-pink-600',    label: 'Blood Readings' },
-  'radio-reports':    { icon: Scan,          bg: 'bg-violet-100',  text: 'text-violet-600',  label: 'Radio Report' },
-  'health-report':    { icon: FileCheck,     bg: 'bg-green-100',   text: 'text-green-600',   label: 'Health Report' },
-  'vaccination':      { icon: Syringe,       bg: 'bg-teal-100',    text: 'text-teal-600',    label: 'Vaccination' },
-  'referral':         { icon: FileText,      bg: 'bg-orange-100',  text: 'text-orange-600',  label: 'Referral' },
-  'follow-up':        { icon: ClipboardList, bg: 'bg-lime-100',    text: 'text-lime-700',    label: 'Follow-up' },
-  'bill':             { icon: FileText,      bg: 'bg-yellow-100',  text: 'text-yellow-700',  label: 'Bill' },
-  'payment':          { icon: FileCheck,     bg: 'bg-emerald-100', text: 'text-emerald-600', label: 'Payment' },
+  'medical-history': { icon: ClipboardList, bg: 'bg-blue-100', text: 'text-blue-600', label: 'Medical History' },
+  'patient-profile': { icon: FileCheck, bg: 'bg-slate-100', text: 'text-slate-600', label: 'Patient Profile' },
+  'doctor-notes': { icon: ClipboardList, bg: 'bg-purple-100', text: 'text-purple-600', label: 'Doctor Notes' },
+  diagnosis: { icon: FileText, bg: 'bg-red-100', text: 'text-red-600', label: 'Diagnosis' },
+  scan: { icon: Scan, bg: 'bg-cyan-100', text: 'text-cyan-600', label: 'Scan' },
+  'lab-result': { icon: FlaskConical, bg: 'bg-amber-100', text: 'text-amber-600', label: 'Lab Result' },
+  xray: { icon: Scan, bg: 'bg-indigo-100', text: 'text-indigo-600', label: 'X-Ray' },
+  'blood-test': { icon: FlaskConical, bg: 'bg-rose-100', text: 'text-rose-600', label: 'Blood Test' },
+  'blood-readings': { icon: Heart, bg: 'bg-pink-100', text: 'text-pink-600', label: 'Blood Readings' },
+  'radio-reports': { icon: Scan, bg: 'bg-violet-100', text: 'text-violet-600', label: 'Radio Report' },
+  'health-report': { icon: FileCheck, bg: 'bg-green-100', text: 'text-green-600', label: 'Health Report' },
+  vaccination: { icon: Syringe, bg: 'bg-teal-100', text: 'text-teal-600', label: 'Vaccination' },
+  referral: { icon: FileText, bg: 'bg-orange-100', text: 'text-orange-600', label: 'Referral' },
+  'follow-up': { icon: ClipboardList, bg: 'bg-lime-100', text: 'text-lime-700', label: 'Follow-up' },
+  bill: { icon: FileText, bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Bill' },
+  payment: { icon: FileCheck, bg: 'bg-emerald-100', text: 'text-emerald-600', label: 'Payment' },
 };
 
 const DEFAULT_META = { icon: FileText, bg: 'bg-slate-100', text: 'text-slate-600', label: 'Medical Record' };
 
 const downloadRecord = (rec) => {
   const meta = TYPE_META[rec.record_type] || DEFAULT_META;
-  const dateStr = rec.created_at
-    ? format(new Date(rec.created_at), 'dd MMMM yyyy')
-    : 'Unknown date';
+  const dateStr = rec.created_at ? format(new Date(rec.created_at), 'dd MMMM yyyy') : 'Unknown date';
 
   const lines = [
     'HelixaCare — Medical Record',
     '─'.repeat(40),
-    `Record Type   : ${meta.label}`,
-    `Record ID     : #${rec.id}`,
-    `Date          : ${dateStr}`,
-    rec.appointment_id ? `Appointment   : #${rec.appointment_id}` : null,
-    rec.doctor_id      ? `Doctor ID     : #${rec.doctor_id}`      : null,
+    `Record Type : ${meta.label}`,
+    `Record ID : #${rec.id}`,
+    `Date : ${dateStr}`,
+    rec.appointment_id ? `Appointment : #${rec.appointment_id}` : null,
+    rec.doctor_id ? `Doctor : ${rec.doctor_name || `Dr. #${rec.doctor_id}`}` : null,
     '─'.repeat(40),
     'Notes / Description:',
     rec.description || '(No notes recorded)',
     '─'.repeat(40),
-    rec.file_url
-      ? `Attached File : ${window.location.origin}/${rec.file_url.replace(/^\//, '')}`
-      : '(No file attachment)',
+    rec.file_url ? `Attached File : ${window.location.origin}/${rec.file_url.replace(/^\//, '')}` : '(No file attachment)',
     '',
     'This document was generated by HelixaCare.',
     'For medical advice, consult your doctor.',
@@ -59,76 +62,111 @@ const downloadRecord = (rec) => {
     .join('\n');
 
   const blob = new Blob([lines], { type: 'text/plain' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
   a.download = `helixacare-record-${rec.id}-${rec.record_type}.txt`;
   a.click();
   URL.revokeObjectURL(url);
 };
 
+const RECORD_TYPES = Object.keys(TYPE_META);
+
 const MedicalRecords = () => {
-  const { data, isLoading, error, refetch } = useFetch(getMedicalRecords);
-  const records = data?.data || data || [];
+  const { data: records, isLoading, error, currentPage, totalPages, totalItems, pageSize, setPage, refetch } = usePaginatedFetch(getMedicalRecords);
+
+  const [uploadModal, setUploadModal] = useState(false);
+  const [form, setForm] = useState({ record_type: 'lab-result', description: '' });
+  const [file, setFile] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const openUpload = () => {
+    setForm({ record_type: 'lab-result', description: '' });
+    setFile(null);
+    setUploadModal(true);
+  };
+
+  const handleUpload = async () => {
+    if (!file) {
+      toast.error('Please choose a file to upload.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const fd = new FormData();
+      fd.append('record_type', form.record_type);
+      fd.append('description', form.description);
+      fd.append('medical_record_file', file);
+      await uploadMedicalRecord(fd);
+      toast.success('Medical record uploaded');
+      setUploadModal(false);
+      refetch();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to upload medical record');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <div className="animate-fade-in">
-      <h1 className="page-title mb-6">Medical Records</h1>
+    <div className="animate-fade-in space-y-6">
+      <PageHeader
+        title="Medical Records"
+        action={
+          <Button onClick={openUpload}>
+            <Plus size={16} />
+            Upload Record
+          </Button>
+        }
+      />
+
       <Card>
-        <CardHeader title="Your Records" />
-        {isLoading && <div className="flex justify-center py-12"><Spinner size="lg" /></div>}
-        {error && <ErrorState message={error} onRetry={refetch} />}
-        {!isLoading && !error && records.length === 0 && (
-          <EmptyState
-            icon={FileText}
-            title="No records yet"
-            description="Medical records uploaded by your doctor after appointments will appear here."
-          />
+        {isLoading && (
+          <div className="flex justify-center py-12">
+            <Spinner size="lg" />
+          </div>
         )}
+        {error && <ErrorState message={error} onRetry={refetch} />}
+        {!isLoading && !error && records.length === 0 && <EmptyState icon={FileText} title="No records yet" description="Medical records uploaded by your doctor after appointments will appear here." />}
         {!isLoading && !error && records.length > 0 && (
           <div className="space-y-3">
             {records.map((rec) => {
               const meta = TYPE_META[rec.record_type] || DEFAULT_META;
               const Icon = meta.icon;
               return (
-                <div key={rec.id} className="p-4 rounded-xl bg-surface-subtle flex gap-4 items-start">
+                <div key={rec.id} className="p-4 rounded-xl bg-surface-subtle hover:bg-surface-warm transition-colors flex gap-4 items-start">
                   {/* Type icon */}
-                  <div className={`w-9 h-9 rounded-lg ${meta.bg} flex items-center justify-center flex-shrink-0`}>
-                    <Icon size={18} className={meta.text} />
+                  <div className={`w-[46px] h-[46px] rounded-xl ${meta.bg} flex items-center justify-center flex-shrink-0`}>
+                    <Icon size={22} className={meta.text} />
                   </div>
 
                   {/* Main content */}
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-text-primary">{meta.label}</p>
-                    {rec.description && (
-                      <p className="text-sm text-text-secondary mt-0.5 line-clamp-2">{rec.description}</p>
-                    )}
-                    <p className="text-xs text-text-muted mt-1">
-                      {rec.created_at ? format(new Date(rec.created_at), 'dd MMM yyyy') : '—'}
-                    </p>
+                    <p className="text-[15px] font-bold text-text-primary">{meta.label}</p>
+                    {rec.description && <p className="text-sm text-text-secondary mt-1 line-clamp-2">{rec.description}</p>}
+                    <div className="flex items-center gap-3 mt-2">
+                      <p className="text-xs text-text-muted">{rec.created_at ? format(new Date(rec.created_at), 'dd MMM yyyy') : '—'}</p>
+                      <span className="text-xs text-text-muted">•</span>
+                      <p className="text-xs text-text-muted">{rec.doctor_id ? (rec.doctor_name || `Dr. #${rec.doctor_id}`) : 'Uploaded by you'}</p>
+                    </div>
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-3 flex-shrink-0 mt-0.5">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     {/* View uploaded file if one exists */}
                     {rec.file_url && (
-                      <a
-                        href={`/${rec.file_url.replace(/^\//, '')}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium"
+                      <button
+                        type="button"
+                        onClick={() => openAuthedFile(`/files/medical-records/${fileNameFromPath(rec.file_url)}`)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-brand-600 hover:text-brand-700 hover:bg-brand-50 font-medium transition-colors"
                       >
                         <ExternalLink size={14} />
                         View
-                      </a>
+                      </button>
                     )}
 
                     {/* Download summary — always available */}
-                    <button
-                      type="button"
-                      onClick={() => downloadRecord(rec)}
-                      className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium"
-                    >
+                    <button type="button" onClick={() => downloadRecord(rec)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-brand-600 hover:text-brand-700 hover:bg-brand-50 font-medium transition-colors">
                       <Download size={14} />
                       Download
                     </button>
@@ -138,7 +176,44 @@ const MedicalRecords = () => {
             })}
           </div>
         )}
+        <Pagination currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} pageSize={pageSize} onPageChange={setPage} />
       </Card>
+
+      {/* Upload Modal */}
+      <Modal
+        isOpen={uploadModal}
+        onClose={() => setUploadModal(false)}
+        title="Upload Medical Record"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setUploadModal(false)}>Cancel</Button>
+            <Button onClick={handleUpload} isLoading={saving}>Upload</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Select label="Record Type" value={form.record_type} onChange={(e) => setForm((p) => ({ ...p, record_type: e.target.value }))}>
+            {RECORD_TYPES.map((t) => (
+              <option key={t} value={t}>{TYPE_META[t].label}</option>
+            ))}
+          </Select>
+          <div>
+            <label className="block text-sm font-medium text-text-primary mb-1.5">Notes (optional)</label>
+            <textarea
+              rows={3}
+              value={form.description}
+              onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+              placeholder="Any context for this document…"
+              className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 resize-none"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-text-primary mb-1.5">File</label>
+            <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setFile(e.target.files[0])} className="block w-full text-sm text-text-secondary file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-brand-600 file:text-white file:font-medium hover:file:bg-brand-700 file:cursor-pointer" />
+            {file && <p className="text-xs text-text-muted mt-1">Selected: {file.name}</p>}
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

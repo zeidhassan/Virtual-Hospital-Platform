@@ -4,7 +4,7 @@ const pool = require('../../src/config/db');
 
 describe('Auth Lockout & Logout Integration Tests', () => {
   const testEmail = 'jane@helixacare.com';
-  const correctPassword = 'patient123';
+  const correctPassword = 'admin123';
   const wrongPassword = 'wrongpassword';
 
   // Reset account state after each test so tests are independent

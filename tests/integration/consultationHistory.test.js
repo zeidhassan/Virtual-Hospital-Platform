@@ -9,8 +9,8 @@ describe('Consultation History API (Section 8.1–8.10)', () => {
   beforeAll(async () => {
     const [adminRes, doctorRes, patientRes] = await Promise.all([
       request(app).post('/api/auth/login').send({ email: 'admin@helixacare.com', password: 'admin123' }),
-      request(app).post('/api/auth/login').send({ email: 'strange@helixacare.com', password: 'doctor123' }),
-      request(app).post('/api/auth/login').send({ email: 'jane@helixacare.com', password: 'patient123' }),
+      request(app).post('/api/auth/login').send({ email: 'strange@helixacare.com', password: 'admin123' }),
+      request(app).post('/api/auth/login').send({ email: 'jane@helixacare.com', password: 'admin123' }),
     ]);
     adminToken   = adminRes.body.token;
     doctorToken  = doctorRes.body.token;
@@ -40,9 +40,11 @@ describe('Consultation History API (Section 8.1–8.10)', () => {
 
   afterAll(async () => {
     await pool.query(
+      "DELETE FROM patients WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'testpatient2_hist_%@helixacare.com')"
+    );
+    await pool.query(
       "DELETE FROM users WHERE email LIKE 'testpatient2_hist_%@helixacare.com'"
     );
-    await pool.end();
   });
 
   // 8.1 — Patient can view unified care timeline

@@ -8,6 +8,7 @@ const PG_CLIENT_ERRORS = {
   '22P02': (err) => `Invalid data type: ${err.message}`,
   '22007': (err) => `Invalid date/time format: ${err.message}`,
   '22003': (err) => `Numeric value out of range: ${err.message}`,
+  '23P01': () => 'This overlaps an existing appointment for the doctor.',
 };
 
 function handleDbError(err, res) {
@@ -15,7 +16,8 @@ function handleDbError(err, res) {
   if (builder) {
     return res.status(400).json({ error: builder(err) });
   }
-  return res.status(500).json({ error: err.message });
+  console.error('[DB Error]', err);
+  return res.status(500).json({ error: 'Something went wrong. Please try again.' });
 }
 
 module.exports = handleDbError;

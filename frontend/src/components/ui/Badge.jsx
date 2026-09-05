@@ -1,18 +1,19 @@
 import clsx from 'clsx';
 
 const variants = {
-  default: 'bg-slate-100 text-slate-700',
-  success: 'bg-green-100 text-green-700',
-  warning: 'bg-amber-100 text-amber-700',
-  danger: 'bg-red-100 text-red-700',
-  info: 'bg-blue-100 text-blue-700',
-  brand: 'bg-brand-100 text-brand-700',
+  default: 'bg-surface-subtle text-text-secondary',
+  success: 'bg-status-success-light text-status-success',
+  warning: 'bg-status-warning-light text-status-warning',
+  danger: 'bg-status-error-light text-status-error',
+  error: 'bg-status-error-light text-status-error',
+  info: 'bg-status-info-light text-status-info',
+  brand: 'bg-brand-50 text-brand-500',
 };
 
 const Badge = ({ children, variant = 'default', className = '' }) => (
   <span
     className={clsx(
-      'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
+      'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold',
       variants[variant],
       className
     )}
@@ -33,6 +34,8 @@ export const statusVariant = (status) => {
     pending: 'warning',
     scheduled: 'info',
     processing: 'info',
+    'in-progress': 'brand',
+    upcoming: 'info',
     cancelled: 'danger',
     rejected: 'danger',
     failed: 'danger',

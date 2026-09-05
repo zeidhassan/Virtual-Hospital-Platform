@@ -22,6 +22,39 @@ router.use(verifyToken);
  */
 router.get('/', doctorAppointmentsController.getDoctorAppointments);
 
+/**
+ * @swagger
+ * /api/doctor/appointments:
+ *   post:
+ *     summary: Doctor directly schedules an appointment with one of their patients
+ *     tags: [Doctor Appointments]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - patient_id
+ *               - appointment_date
+ *               - appointment_start_time
+ *               - appointment_end_time
+ *             properties:
+ *               patient_id: { type: integer }
+ *               appointment_date: { type: string, format: date }
+ *               appointment_start_time: { type: string, example: "14:00" }
+ *               appointment_end_time: { type: string, example: "14:30" }
+ *               notes: { type: string }
+ *     responses:
+ *       201:
+ *         description: Appointment created
+ *       409:
+ *         description: Overlapping appointment
+ */
+router.post('/', doctorAppointmentsController.createAppointmentForPatient);
+
 router.get('/medical-records/:appointmentId', doctorAppointmentsController.getAppointmentRecords);
 /**
  * @swagger
@@ -59,6 +92,38 @@ router.get('/medical-records/:appointmentId', doctorAppointmentsController.getAp
  *         description: Appointment not found
  */
 router.put('/:id/status', doctorAppointmentsController.updateAppointmentStatus);
+
+/**
+ * @swagger
+ * /api/doctor/appointments/{id}/reschedule:
+ *   put:
+ *     summary: Doctor reschedules one of their own appointments
+ *     tags: [Doctor Appointments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               appointment_date: { type: string, format: date }
+ *               appointment_start_time: { type: string }
+ *               appointment_end_time: { type: string }
+ *     responses:
+ *       200:
+ *         description: Appointment rescheduled
+ *       400:
+ *         description: Invalid reschedule (e.g., outside doctor's time slots)
+ *       403:
+ *         description: Not your appointment
+ */
+router.put('/:id/reschedule', doctorAppointmentsController.rescheduleAppointment);
 /**
  * @swagger
  * /api/doctor/appointments/{appointmentId}/records:

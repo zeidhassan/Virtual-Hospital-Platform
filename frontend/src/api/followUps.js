@@ -6,5 +6,7 @@ export const getDoctorFollowUps    = (params = {})  => apiClient.get('/follow-up
 export const getAdminFollowUps     = (params = {})  => apiClient.get('/follow-ups/admin', { params });
 export const completeFollowUp      = (id)           => apiClient.put(`/follow-ups/${id}/complete`);
 export const cancelFollowUp        = (id)           => apiClient.put(`/follow-ups/${id}/cancel`);
+export const assignFollowUp        = (id, data)     => apiClient.put(`/follow-ups/${id}/assign`, data);
+export const rescheduleFollowUp    = (id, data)     => apiClient.put(`/follow-ups/${id}/reschedule`, data);
 export const processReminders      = ()             => apiClient.post('/follow-ups/process-reminders');
 export const processMissed         = ()             => apiClient.post('/follow-ups/process-missed');

@@ -1,4 +1,5 @@
 const pool = require('../../config/db');
+const paginate = require('../../utils/pagination');
 
 // Urgency priority map (lower = higher priority)
 const URGENCY_PRIORITY = { emergency: 1, urgent: 2, standard: 3, self_care: 4 };
@@ -76,16 +77,33 @@ exports.assessTriage = async (req, res) => {
     if (followUpRecommended) {
       const scheduledDate = new Date();
       scheduledDate.setDate(scheduledDate.getDate() + 7);
+      // Follow-ups are appointments (appointment_type = 'follow_up') in the unified
+      // module — this one starts unassigned, same as an admin-created follow-up,
+      // and needs a doctor assigned before it's actionable.
       await pool.query(
-        `INSERT INTO follow_up_schedules (patient_id, triage_session_id, scheduled_date, notes, status)
-         VALUES ($1, $2, $3, $4, 'pending')`,
+        `INSERT INTO appointments (patient_id, triage_session_id, appointment_date, notes, status, appointment_type, created_by)
+         VALUES ($1, $2, $3, $4, 'pending', 'follow_up', $5)`,
         [
           patient.id,
           session.id,
           scheduledDate.toISOString().split('T')[0],
-          `Auto-created follow-up from triage: ${result.urgency_level}`
+          `Auto-created follow-up from triage: ${result.urgency_level}`,
+          req.user.id
         ]
       );
+
+      const admins = await pool.query('SELECT id FROM users WHERE role = $1', ['admin']);
+      for (const admin of admins.rows) {
+        await pool.query(
+          `INSERT INTO notifications (user_id, title, body, is_read, category)
+           VALUES ($1, $2, $3, FALSE, 'followup')`,
+          [
+            admin.id,
+            'Follow-Up Needs Assignment',
+            `A follow-up auto-created from a ${result.urgency_level} triage session for patient ID ${patient.id} needs a doctor assigned.`
+          ]
+        );
+      }
     }
 
     return res.status(201).json({ message: 'Triage assessment complete.', data: session });
@@ -101,11 +119,14 @@ exports.getTriageHistory = async (req, res) => {
     const patient = await getPatientByUserId(req.user.id);
     if (!patient) return res.status(404).json({ error: 'Patient profile not found.' });
 
-    const { rows } = await pool.query(
-      'SELECT * FROM triage_sessions WHERE patient_id = $1 ORDER BY created_at DESC',
-      [patient.id]
-    );
-    return res.status(200).json({ data: rows });
+    const result = await paginate({
+      table: 'triage_sessions',
+      page: parseInt(req.query.page) || 1,
+      limit: parseInt(req.query.limit) || 10,
+      sort: req.query.sort || '-created_at',
+      filters: { patient_id: patient.id },
+    });
+    return res.status(200).json(result);
   } catch (err) {
     console.error('[Triage] getTriageHistory error:', err);
     return res.status(500).json({ error: 'Internal server error.' });
@@ -163,16 +184,21 @@ exports.getEscalatedSessions = async (req, res) => {
     const doctor = await getDoctorByUserId(req.user.id);
     if (!doctor) return res.status(404).json({ error: 'Doctor profile not found.' });
 
-    const { rows } = await pool.query(
-      `SELECT ts.*, u.full_name AS patient_name
-       FROM triage_sessions ts
-       JOIN patients p ON ts.patient_id = p.id
-       JOIN users u ON p.user_id = u.id
-       WHERE ts.escalated_to_doctor_id = $1
-       ORDER BY ts.created_at DESC`,
-      [doctor.id]
-    );
-    return res.status(200).json({ data: rows });
+    const result = await paginate({
+      table: 'triage_sessions',
+      page: parseInt(req.query.page) || 1,
+      limit: parseInt(req.query.limit) || 10,
+      sort: req.query.sort || '-created_at',
+      sortTable: 'ts',
+      join: `
+        AS ts
+        JOIN patients p ON ts.patient_id = p.id
+        JOIN users u ON p.user_id = u.id
+      `,
+      select: 'ts.*, u.full_name AS patient_name',
+      filters: { 'ts.escalated_to_doctor_id': doctor.id },
+    });
+    return res.status(200).json(result);
   } catch (err) {
     console.error('[Triage] getEscalatedSessions error:', err);
     return res.status(500).json({ error: 'Internal server error.' });
@@ -180,9 +206,16 @@ exports.getEscalatedSessions = async (req, res) => {
 };
 
 // GET /api/triage/admin/sessions
+// Not routed through paginate() — date_from/date_to are range filters, which
+// the shared utility's exact/LIKE filter matching can't express — so
+// pagination is applied manually here, matching paginate()'s response shape.
 exports.getAdminSessions = async (req, res) => {
   try {
     const { urgency_level, date_from, date_to } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
     const conditions = [];
     const params = [];
 
@@ -201,16 +234,30 @@ exports.getAdminSessions = async (req, res) => {
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const { rows } = await pool.query(
-      `SELECT ts.*, u.full_name AS patient_name
-       FROM triage_sessions ts
-       JOIN patients p ON ts.patient_id = p.id
-       JOIN users u ON p.user_id = u.id
-       ${where}
-       ORDER BY ts.created_at DESC`,
-      params
-    );
-    return res.status(200).json({ data: rows });
+    const [dataResult, countResult] = await Promise.all([
+      pool.query(
+        `SELECT ts.*, u.full_name AS patient_name, du.full_name AS escalated_to_doctor_name
+         FROM triage_sessions ts
+         JOIN patients p ON ts.patient_id = p.id
+         JOIN users u ON p.user_id = u.id
+         LEFT JOIN doctors d ON ts.escalated_to_doctor_id = d.id
+         LEFT JOIN users du ON d.user_id = du.id
+         ${where}
+         ORDER BY ts.created_at DESC
+         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, limit, offset]
+      ),
+      pool.query(`SELECT COUNT(*) AS total FROM triage_sessions ts ${where}`, params),
+    ]);
+
+    const total = parseInt(countResult.rows[0].total);
+    return res.status(200).json({
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      pageSize: limit,
+      totalItems: total,
+      data: dataResult.rows,
+    });
   } catch (err) {
     console.error('[Triage] getAdminSessions error:', err);
     return res.status(500).json({ error: 'Internal server error.' });

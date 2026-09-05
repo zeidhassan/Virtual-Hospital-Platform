@@ -11,11 +11,12 @@ exports.getAllMessages = async (req, res) => {
 
     const validColumns = [
       "id",
+      "conversation_id",
       "sender_id",
-      "receiver_id",
       "message",
-      "timestamp",
-      "is_read"
+      "attachment_url",
+      "attachment_type",
+      "created_at"
     ];
 
     const filters = {};
@@ -64,13 +65,13 @@ exports.createMessage = async (req, res) => {
     return res.status(403).json({ error: 'Only admins can create messages.' });
   }
 
-  const { sender_id, receiver_id, message, is_read } = req.body;
+  const { conversation_id, sender_id, message, attachment_url, attachment_type } = req.body;
 
   try {
     const result = await pool.query(
-      `INSERT INTO messages (sender_id, receiver_id, message, is_read)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [sender_id, receiver_id, message, is_read]
+      `INSERT INTO messages (conversation_id, sender_id, message, attachment_url, attachment_type)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [conversation_id, sender_id, message, attachment_url, attachment_type]
     );
 
     res.status(201).json(result.rows[0]);
@@ -85,12 +86,12 @@ exports.updateMessage = async (req, res) => {
     return res.status(403).json({ error: 'Only admins can update messages.' });
   }
 
-  const { message, is_read } = req.body;
+  const { message, attachment_url, attachment_type } = req.body;
 
   try {
     const result = await pool.query(
-      `UPDATE messages SET message = $1, is_read = $2 WHERE id = $3 RETURNING *`,
-      [message, is_read, req.params.id]
+      `UPDATE messages SET message = $1, attachment_url = $2, attachment_type = $3 WHERE id = $4 RETURNING *`,
+      [message, attachment_url, attachment_type, req.params.id]
     );
 
     if (result.rows.length === 0) {

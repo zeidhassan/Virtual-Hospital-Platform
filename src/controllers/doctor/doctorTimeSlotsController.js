@@ -39,7 +39,7 @@ exports.getDoctorTimeSlots = async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('[getDoctorTimeSlots] Error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };
 
@@ -71,7 +71,8 @@ exports.createDoctorTimeSlot = async (req, res) => {
 
     res.status(201).json(inserted.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };
 
@@ -115,7 +116,8 @@ exports.updateDoctorTimeSlot = async (req, res) => {
 
     res.json(updated.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };
 
@@ -144,6 +146,7 @@ exports.deleteDoctorTimeSlot = async (req, res) => {
 
     res.json({ message: 'Deleted.', slot: deleted.rows[0] });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };

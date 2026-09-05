@@ -9,7 +9,7 @@ const sizes = {
 const Spinner = ({ size = 'md', className = '' }) => (
   <div
     className={clsx(
-      'rounded-full border-brand-200 border-t-brand-600 animate-spin',
+      'rounded-full border-slate-200 border-t-brand-500 animate-spin',
       sizes[size],
       className
     )}

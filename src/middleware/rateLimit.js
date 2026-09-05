@@ -24,10 +24,11 @@ const otpLimiter = rateLimit({
 // General API traffic limit
 const generalApiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
+  max: 300,
   message: { error: 'Too many requests. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test', // disable in test env — the suite makes far more than 300 requests per run
 });
 
 // Triage assess endpoint — strict to prevent abuse

@@ -5,7 +5,7 @@ const router = express.Router();
 const ctrl = require('../../controllers/supportTickets/supportTicketsController');
 const verifyToken = require('../../middleware/verifyToken');            // JWT -> req.user
 const requireRole = require('../../middleware/requireRole');            // e.g., requireRole('patient')
-const { uploadSupportTicket } = require('../../middleware/uploadMiddleware');
+const { uploadSupportTicket, wrapUpload } = require('../../middleware/uploadMiddleware');
 
 /**
  * @swagger
@@ -151,7 +151,7 @@ router.post(
   '/patient',
   verifyToken,
   requireRole('patient'),
-  uploadSupportTicket.single('file'),
+  wrapUpload(uploadSupportTicket, 'file'),
   ctrl.patientCreateTicket
 );
 
@@ -253,7 +253,7 @@ router.post(
   '/doctor',
   verifyToken,
   requireRole('doctor'),
-  uploadSupportTicket.single('file'),
+  wrapUpload(uploadSupportTicket, 'file'),
   ctrl.doctorCreateTicket
 );
 
@@ -361,7 +361,7 @@ router.post(
   '/admin',
   verifyToken,
   requireRole('admin'),
-  uploadSupportTicket.single('file'),
+  wrapUpload(uploadSupportTicket, 'file'),
   ctrl.adminCreateTicket
 );
 

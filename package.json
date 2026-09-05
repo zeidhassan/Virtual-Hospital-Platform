@@ -7,7 +7,7 @@
     "start": "node server.js",
     "refresh": "touch server.js",
     "restart": "pkill -f nodemon; pkill -f vite; npm run dev",
-    "test": "cross-env NODE_ENV=test jest ",
+    "test": "cross-env NODE_ENV=test jest --runInBand --forceExit",
     "watch": "cross-env NODE_ENV=test jest --runInBand --watch",
     "coverage": "cross-env NODE_ENV=test jest --runInBand --coverage  --collectCoverageFrom='src/{config,controllers,middleware,routes,utils,validators}/**/*.js'"
   },
@@ -16,9 +16,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@paypal/checkout-server-sdk": "^1.0.3",
     "axios": "^1.11.0",
-    "bcrypt": "^5.1.1",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",

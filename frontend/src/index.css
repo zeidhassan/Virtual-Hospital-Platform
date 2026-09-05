@@ -3,6 +3,33 @@
 @tailwind utilities;
 
 @layer base {
+  /* Design tokens as CSS custom properties: the single source of truth for
+     light/dark. Redefining these here — once — is what makes `bg-surface`,
+     `text-text-primary`, etc. theme-aware everywhere they're used, natively
+     via the cascade, with no per-usage `dark:` variant required. */
+  :root {
+    --surface: #FFFFFF;
+    --surface-muted: #FAFAF8;
+    --surface-subtle: #F6F3EF;
+    --surface-warm: #F5F1EC;
+    --text-primary: #1C1917;
+    --text-secondary: #57534E;
+    --text-muted: #A8A29E;
+    --text-inverse: #FFFFFF;
+  }
+
+  .dark {
+    color-scheme: dark;
+    --surface: #1E1E1E;
+    --surface-muted: #2A2A2A;
+    --surface-subtle: #333333;
+    --surface-warm: #3A3A3A;
+    --text-primary: #F5F5F5;
+    --text-secondary: #D4D4D4;
+    --text-muted: #A3A3A3;
+    --text-inverse: #1C1917;
+  }
+
   html {
     @apply text-text-primary antialiased;
     font-size: 16px;
@@ -10,7 +37,7 @@
   }
 
   body {
-    @apply bg-surface-muted min-h-screen;
+    @apply bg-surface-muted min-h-screen text-text-primary;
   }
 
   *:focus-visible {
@@ -20,11 +47,199 @@
   *:focus:not(:focus-visible) {
     @apply outline-none;
   }
+
+  /* Below: overrides for raw (non-token) Tailwind palette classes used ad hoc
+     across pages for status/category chips — these aren't part of the
+     surface/text variable system above, so they still need explicit
+     class-based dark handling. */
+  .dark .border-slate-200 {
+    @apply border-[#404040];
+  }
+
+  .dark .border-slate-100 {
+    @apply border-[#333333];
+  }
+
+  .dark .border-slate-300 {
+    @apply border-[#4A4A4A];
+  }
+
+  .dark .bg-white {
+    @apply bg-[#2A2A2A];
+  }
+
+  .dark .bg-orange-50 {
+    @apply bg-[#3A2A1A];
+  }
+
+  .dark .bg-orange-100 {
+    @apply bg-[#4A3520];
+  }
+
+  .dark .border-orange-100 {
+    @apply border-[#5A4530];
+  }
+
+  .dark .border-orange-200 {
+    @apply border-[#6A5540];
+  }
+
+  .dark .border-orange-300 {
+    @apply border-[#7A6550];
+  }
+
+  .dark .bg-red-50 {
+    @apply bg-[#3A1A1A];
+  }
+
+  .dark .border-red-100 {
+    @apply border-[#5A3030];
+  }
+
+  .dark .border-red-200 {
+    @apply border-[#6A4040];
+  }
+
+  .dark .bg-brand-50 {
+    @apply bg-[#2A1A3A];
+  }
+
+  .dark input,
+  .dark textarea,
+  .dark select {
+    @apply bg-[#2A2A2A] border-[#404040];
+    color: #F5F5F5;
+  }
+
+  .dark input::placeholder,
+  .dark textarea::placeholder {
+    color: #A3A3A3;
+  }
+
+  .dark .card,
+  .dark [class*="Card"] {
+    @apply bg-[#2A2A2A] border-[#404040];
+  }
+
+  .dark header {
+    @apply bg-[#1E1E1E] border-[#404040];
+  }
+
+  .dark aside {
+    @apply bg-[#1E1E1E] border-[#404040];
+  }
+
+  /* ── Extended overrides: every raw-palette color used across the app ──
+     Pages define ad-hoc status/category chips with bg-{hue}-50/100 +
+     text-{hue}-600..900, none of which are theme-aware on their own.
+     Without this, chip backgrounds stay glaringly light in dark mode and,
+     worse, the paired 600-900 text (chosen to read on a LIGHT chip) turns
+     dark-on-dark and disappears. Text tiers map to that hue's own ~400
+     shade (Tailwind's own light/dark convention); light chip backgrounds
+     map to a muted dark tint of the same hue. */
+
+  /* Neutrals */
+  .dark .bg-slate-50  { @apply bg-[#242424]; }
+  .dark .bg-slate-100 { @apply bg-[#2A2A2A]; }
+  .dark .bg-slate-200 { @apply bg-[#333333]; }
+  .dark .bg-slate-300 { @apply bg-[#3A3A3A]; }
+  .dark .hover\:bg-slate-50:hover  { @apply bg-[#2A2A2A]; }
+  .dark .hover\:bg-slate-100:hover { @apply bg-[#333333]; }
+  .dark .hover\:bg-slate-200:hover { @apply bg-[#3A3A3A]; }
+  .dark .border-slate-50  { @apply border-[#333333]; }
+  .dark .border-slate-600 { @apply border-[#545454]; }
+  .dark .border-slate-800 { @apply border-[#454545]; }
+  .dark .hover\:border-slate-300:hover { @apply border-[#545454]; }
+  .dark .text-slate-500 { color: #B8B8B8; }
+  .dark .text-slate-600 { color: #D4D4D4; }
+  .dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { @apply border-[#333333]; }
+  .dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) { @apply border-[#404040]; }
+
+  /* Red */
+  .dark .bg-red-100 { @apply bg-[#4A2222]; }
+  .dark .hover\:bg-red-50:hover  { @apply bg-[#3A1A1A]; }
+  .dark .hover\:bg-red-500:hover { background-color: #C4342E; }
+  .dark .hover\:bg-red-700:hover { background-color: #A82A24; }
+  .dark .border-red-300 { @apply border-[#7A5050]; }
+  .dark .hover\:border-red-300:hover { @apply border-[#7A5050]; }
+  .dark .hover\:border-red-800:hover { border-color: #7A3030; }
+  .dark .text-red-500, .dark .text-red-600, .dark .text-red-700,
+  .dark .text-red-800, .dark .text-red-900 { color: #F87171; }
+  .dark .hover\:text-red-500:hover, .dark .hover\:text-red-600:hover,
+  .dark .hover\:text-red-700:hover, .dark .hover\:text-red-800:hover { color: #F87171; }
+  .dark .hover\:text-red-300:hover { color: #FCA5A5; }
+  .dark .hover\:text-red-400:hover { color: #F87171; }
+
+  /* Orange / Amber / Yellow / Lime */
+  .dark .bg-amber-50  { background-color: #3A2E18; }
+  .dark .bg-amber-100 { background-color: #4A3A1E; }
+  .dark .hover\:bg-amber-50:hover  { background-color: #3A2E18; }
+  .dark .hover\:bg-amber-100:hover { background-color: #4A3A1E; }
+  .dark .hover\:bg-amber-700:hover { background-color: #B87A1E; }
+  .dark .border-amber-200 { border-color: #6A5A38; }
+  .dark .text-orange-600 { color: #FB923C; }
+  .dark .text-amber-500, .dark .text-amber-600, .dark .text-amber-700,
+  .dark .text-amber-800, .dark .text-amber-900 { color: #FBBF24; }
+  .dark .hover\:text-amber-500:hover, .dark .hover\:text-amber-900:hover { color: #FBBF24; }
+  .dark .text-yellow-700 { color: #FACC15; }
+  .dark .bg-yellow-100 { background-color: #4A421E; }
+  .dark .text-lime-700 { color: #A3E635; }
+  .dark .bg-lime-100 { background-color: #38421E; }
+
+  /* Green / Emerald / Teal / Cyan */
+  .dark .bg-green-50  { background-color: #1A3A22; }
+  .dark .bg-green-100 { background-color: #204A2A; }
+  .dark .hover\:bg-green-50:hover { background-color: #1A3A22; }
+  .dark .border-green-200 { border-color: #305A3E; }
+  .dark .text-green-600, .dark .text-green-700 { color: #4ADE80; }
+  .dark .hover\:text-green-600:hover { color: #4ADE80; }
+  .dark .bg-emerald-50  { background-color: #1A3A2E; }
+  .dark .bg-emerald-100 { background-color: #204A38; }
+  .dark .hover\:bg-emerald-100:hover { background-color: #204A38; }
+  .dark .border-emerald-200 { border-color: #305A48; }
+  .dark .border-emerald-300 { border-color: #3A6A56; }
+  .dark .hover\:border-emerald-300:hover { border-color: #3A6A56; }
+  .dark .text-emerald-500, .dark .text-emerald-600, .dark .text-emerald-700,
+  .dark .text-emerald-800, .dark .text-emerald-900 { color: #34D399; }
+  .dark .hover\:text-emerald-700:hover { color: #34D399; }
+  .dark .bg-teal-100 { background-color: #1A3A38; }
+  .dark .text-teal-600 { color: #2DD4BF; }
+  .dark .bg-cyan-100 { background-color: #1A343A; }
+  .dark .text-cyan-600 { color: #22D3EE; }
+
+  /* Blue / Indigo / Violet / Purple / Pink / Rose */
+  .dark .bg-blue-50  { background-color: #1A263A; }
+  .dark .bg-blue-100 { background-color: #203048; }
+  .dark .bg-blue-200 { background-color: #284060; }
+  .dark .hover\:bg-blue-50:hover { background-color: #1A263A; }
+  .dark .border-blue-200 { border-color: #30508A; }
+  .dark .text-blue-600, .dark .text-blue-700, .dark .text-blue-800 { color: #60A5FA; }
+  .dark .hover\:text-blue-600:hover, .dark .hover\:text-blue-800:hover { color: #60A5FA; }
+  .dark .hover\:text-blue-300:hover { color: #93C5FD; }
+  .dark .bg-indigo-50  { background-color: #221A3A; }
+  .dark .bg-indigo-100 { background-color: #2A2048; }
+  .dark .border-indigo-200 { border-color: #352A5A; }
+  .dark .text-indigo-600, .dark .text-indigo-700, .dark .text-indigo-800 { color: #818CF8; }
+  .dark .hover\:text-indigo-700:hover { color: #818CF8; }
+  .dark .bg-violet-100 { background-color: #2A1E3A; }
+  .dark .text-violet-600 { color: #A78BFA; }
+  .dark .bg-purple-100 { background-color: #2E1A3A; }
+  .dark .text-purple-600 { color: #C084FC; }
+  .dark .bg-pink-100 { background-color: #3A1A2E; }
+  .dark .text-pink-600 { color: #F472B6; }
+  .dark .bg-rose-100 { background-color: #3A1A24; }
+  .dark .text-rose-600 { color: #FB7185; }
+
+  /* Status badge tokens (Badge.jsx) */
+  .dark .bg-status-success-light { background-color: #1A3A22; }
+  .dark .bg-status-warning-light { background-color: #3A2E18; }
+  .dark .bg-status-error-light   { background-color: #3A1A1A; }
+  .dark .bg-status-info-light    { background-color: #1A263A; }
 }
 
 @layer components {
   .page-container {
-    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8;
+    @apply max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8;
   }
 
   .page-title {

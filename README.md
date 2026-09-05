@@ -1,111 +1,189 @@
-# Virtual Hospital Platform — Back-End System
+# HelixaCare — Virtual Hospital Platform
 
-A full-featured virtual healthcare REST API built with **Node.js**, **Express**, and **PostgreSQL**. The platform serves three distinct user roles — **patients**, **doctors**, and **admins** — and covers the full clinical & administrative workflow of a digital hospital.
+A full-stack virtual hospital platform providing AI-assisted triage, teleconsultation, remote patient monitoring, and integrated digital health records — built as a **React (Vite)** frontend on top of a **Node.js / Express** REST API and a **36-table PostgreSQL** database. The system serves three roles — **Patient**, **Doctor**, and **Admin** — each with a dedicated dashboard and role-scoped access to the platform's features.
+
+Validated by **297 automated tests across 31 Jest/Supertest suites**.
+
+---
+
+## Screenshots
+
+### Patient
+
+| Dashboard | AVA Triage | Book Appointment |
+|---|---|---|
+| ![Patient Dashboard](Screenshots/01_patient_dashboard.png) | ![AVA Triage](Screenshots/02_ava_triage.png) | ![Book Appointment](Screenshots/03_book_appointment.png) |
+
+| Pharmacy — Place Order | Medical Records | Billing & Payments |
+|---|---|---|
+| ![Place Order](Screenshots/04_pharmacy_place_order.png) | ![Medical Records](Screenshots/05_patient_medical_records.png) | ![Billing & Payments](Screenshots/06_patient_billing_payments.png) |
+
+### Doctor
+
+| Dashboard | Escalated Triage | Patient Timeline |
+|---|---|---|
+| ![Doctor Dashboard](Screenshots/07_doctor_dashboard.png) | ![Escalated Triage](Screenshots/08_escalated_triage.png) | ![Patient Timeline](Screenshots/09_doctor_patient_timeline.png) |
+
+| Medical Records | Pharmacy Orders | Time Slots |
+|---|---|---|
+| ![Doctor Medical Records](Screenshots/10_doctor_medical_records.png) | ![Doctor Pharmacy Orders](Screenshots/11_doctor_pharmacy_orders.png) | ![Time Slots](Screenshots/12_doctor_time_slots.png) |
+
+### Admin
+
+| Stats & Charts | Database Admin Board | Doctor Subscriptions |
+|---|---|---|
+| ![Admin Stats](Screenshots/13_admin_stats_charts.png) | ![Database Admin Board](Screenshots/14_admin_database_board.png) | ![Doctor Subscriptions](Screenshots/15_admin_doctor_subscriptions.png) |
+
+| Insurance Requests | Billing | Support Tickets |
+|---|---|---|
+| ![Insurance Requests](Screenshots/16_admin_insurance_requests.png) | ![Admin Billing](Screenshots/17_admin_billing.png) | ![Support Tickets](Screenshots/18_admin_support_tickets.png) |
 
 ---
 
 ## Features
 
-### Authentication & Authorization
-- JWT-based authentication (Bearer token)
-- OAuth2 Social Login via Google and Facebook (Passport.js)
-- Role-based access control: `admin`, `doctor`, `patient`
-- Plan-based feature gating for doctors (`checkPlanFeature` middleware)
+### AVA — AI-Assisted Triage
+- Rule-based symptom classification (routine / urgent / emergency) against an admin-editable keyword table — transparent and traceable by design, not a black-box model
+- Urgent/emergency cases automatically escalate into the doctor's Escalated Triage queue
+- Full triage history per patient
 
 ### Patient
-- Register, login, and manage profile
-- Book, reschedule, and cancel appointments
-- View medical records and prescriptions
-- Upload and download clinical files (Multer)
-- Answer health assessment questions (question bank)
-- Submit and track pharmacy orders
-- Submit insurance requests
-- Manage billing and PayPal payments
-- Open and track support tickets
+- Register/login (local + Google/Facebook OAuth), profile management
+- AVA symptom triage, triage history
+- Book, view, and manage appointments (database-level exclusion constraint prevents any double-booking)
+- Medical records and prescriptions (encrypted at rest), prescription refill requests
+- Pharmacy ordering, order history
+- Billing & payments — mock FPX bank transfer or card, saved payment methods, insurance policy display
+- Insurance claim submission and tracking
+- Chronic-condition health logs and consultation history timeline
+- Doctor-assigned health questionnaires
+- Messaging, notifications, support tickets
 
 ### Doctor
-- Manage profile and availability (time slots)
-- View and respond to appointments
-- Write prescriptions and add response notes
-- Attach medical records to appointments
-- Subscribe to doctor plans (feature-gated tiers)
-- View patient health question responses
+- Dashboard with today's schedule, escalated triage alerts, and quick actions
+- Patient list and full per-patient care timeline
+- Appointment and weekly time-slot management
+- Write/manage prescriptions, add and edit medical records
+- Review and fulfil pharmacy orders for their own patients
+- Accept/reject patient insurance claims
+- Question bank contributions and patient questionnaire review
+- Subscription plan management (Basic / Plus / Premium tiers)
 
 ### Admin
-- Full CRUD database board for all entities
-- Manage doctor time slots and appointments
-- Manage subscriptions and billing
-- Manage doctor subscription plans
-- Manage insurance requests
-- Manage the health question bank
-- View platform analytics: stats and charts
-- Export data (CSV / PDF via `json2csv` and `pdfkit`)
-- Manage health programs, services, and support tickets
+- Platform-wide analytics dashboard (revenue, appointments, users by role, top doctors/medications) via Recharts
+- Generic Database Admin Board — CRUD access across every core entity, for operational data correction
+- Appointment, billing, and pharmacy order oversight platform-wide
+- Doctor subscription approval workflow, doctor plan management
+- Insurance claim administration
+- AVA triage rule configuration and triage session auditing
+- Support ticket resolution, shared question bank moderation
 
 ### Platform-Wide
-- Notification and messaging system
-- Swagger / OpenAPI 3.0 documentation
-- Rate limiting: login (5/min), OTP (3/10 min), general API (100/15 min)
-- Helmet security headers + CSP in production
-- HTTPS redirect behind reverse proxy in production
-- Connection pooling with configurable pool size and timeouts
+- JWT authentication with a revocation blacklist (logout actually invalidates the token)
+- Role-based access control enforced at the middleware layer
+- AES-256-GCM field-level encryption for sensitive record content
+- Threaded messaging and a shared notification system
+- Swagger / OpenAPI documentation
+- Rate limiting (login, general API) and Helmet security headers
+- Parameterised queries throughout — no raw string-built SQL
 
 ---
 
 ## Tech Stack
 
-| Layer           | Technology                          |
-|-----------------|-------------------------------------|
-| Runtime         | Node.js                             |
-| Framework       | Express 5                           |
-| Database        | PostgreSQL (local or Neon cloud)    |
-| Auth            | JWT, Passport.js (Google, Facebook) |
-| Payments        | PayPal Checkout Server SDK          |
-| File Uploads    | Multer                              |
-| PDF Generation  | pdfkit                              |
-| CSV Export      | json2csv                            |
-| Security        | Helmet, express-rate-limit, bcrypt  |
-| Validation      | express-validator                   |
-| API Docs        | Swagger (swagger-jsdoc + swagger-ui-express) |
-| Testing         | Jest, Supertest                     |
+| Layer | Technology |
+|---|---|
+| Frontend | React 18, Vite, Tailwind CSS, React Router, Recharts |
+| Backend | Node.js, Express, raw `pg` driver (no ORM) |
+| Database | PostgreSQL (local or Neon cloud), 36 relational tables |
+| Auth | JWT, Passport.js (Google & Facebook OAuth) |
+| Payments | Mock FPX / card flow (no live payment gateway) |
+| Encryption | AES-256-GCM for sensitive field content |
+| File Uploads | Multer |
+| PDF / CSV Export | pdfkit, json2csv |
+| Security | Helmet, express-rate-limit, bcrypt, express-validator |
+| API Docs | Swagger (swagger-jsdoc + swagger-ui-express) |
+| Testing | Jest, Supertest (297 tests / 31 suites) |
 
 ---
 
-## Installation
+## Getting Started
+
+### Prerequisites
+- Node.js 18+
+- PostgreSQL (local instance, or a [Neon](https://neon.tech) connection string)
+
+### 1. Clone and install
 
 ```bash
-git clone https://github.com/your-repo/virtual-hospital-platform.git
+git clone https://github.com/zeidhassan/virtual-hospital-platform.git
 cd virtual-hospital-platform
 npm install
-cp env.example .env
+npm install --prefix frontend
 ```
 
-Edit `.env` with your credentials (see Environment Variables below), then start the server:
+### 2. Configure environment variables
 
 ```bash
-node index.js
+cp env.example .env
+cp frontend/.env.example frontend/.env
 ```
+
+Fill in `.env` (see [Environment Variables](#environment-variables) below). The frontend `.env` can usually be left as-is — it defaults to routing API calls through the Vite dev proxy.
+
+### 3. Set up the database
+
+```bash
+# Fresh schema + seed data
+psql -U your_user -d your_database -f "src/SQL Queries/ProductionSetup.sql"
+
+# Or reset an existing database to clean demo data (safe to re-run)
+psql -U your_user -d your_database -f "src/SQL Queries/resetDemoData.sql"
+```
+
+### 4. Run it
+
+```bash
+# From the project root — starts both the backend (port 5000) and the
+# frontend dev server (port 3000) together
+npm run dev
+```
+
+Or run them separately:
+
+```bash
+npm start                        # backend only, http://localhost:5000
+npm run dev --prefix frontend    # frontend only, http://localhost:3000
+```
+
+### Demo credentials
+
+After running `resetDemoData.sql`, every seeded account logs in with the password **`admin123`**:
+
+| Role | Email |
+|---|---|
+| Admin | `admin@helixacare.com` |
+| Doctor | `strange@helixacare.com` (also `palmer@helixacare.com`, `banner@helixacare.com`) |
+| Patient | `jane@helixacare.com` (also `john@helixacare.com`, `sarah@helixacare.com`, `peter@helixacare.com`) |
 
 ---
 
 ## Environment Variables
 
-Copy `env.example` to `.env` and fill in the values. **Never commit `.env`.**
-
 ```env
 # Server
 PORT=5000
 
-# Database — set DB_MODE to "neon" (cloud connection string) or "local" (discrete credentials)
-DB_MODE=neon
+# DB_MODE: "neon" (cloud connection string) or "local" (discrete credentials)
+DB_MODE=local
 
-# Neon / cloud mode: provide a full connection string
+# Neon / cloud mode
 DB_URL=
 
-# Local mode: provide individual credentials
+# Local mode
 DB_USER=postgres
 DB_HOST=localhost
-DB_DATABASE=virtual_hospital_platform
+DB_DATABASE=helixacare_db
 DB_PASSWORD=
 DB_PORT=5432
 
@@ -115,63 +193,36 @@ DB_POOL_MAX=10
 DB_IDLE_TIMEOUT_MS=30000
 DB_CONN_TIMEOUT_MS=10000
 
-# JWT
+# JWT — required, no fallback (the app will refuse to start without it)
 JWT_SECRET=
-JWT_EXPIRES_IN=1d
 
-# OAuth2 — Google
+# Field-level encryption for sensitive record content — required, 64 hex
+# characters (32 bytes)
+ENCRYPTION_KEY=
+
+# OAuth2 (optional — omit to disable social login)
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
-
-# OAuth2 — Facebook
 FACEBOOK_CLIENT_ID=
 FACEBOOK_CLIENT_SECRET=
 
-# PayPal
-PAYPAL_CLIENT_ID=
-PAYPAL_CLIENT_SECRET=
-PAYPAL_ENVIRONMENT=sandbox
-PAYPAL_CURRENCY=USD
-
-# CORS
+# CORS — the frontend origin allowed to call the API
 FRONTEND_ORIGIN=http://localhost:3000
-
-# Encryption (used for sensitive data at rest)
-ENCRYPTION_KEY=
 ```
 
----
-
-## Database Setup
-
-Two SQL scripts are provided in `src/SQL Queries/`:
-
-```bash
-# Fresh production setup (schema + seed data)
-psql -U your_user -d virtual_hospital_platform -f "src/SQL Queries/ProductionSetup.sql"
-
-# Reset to demo data (useful for development/staging)
-psql -U your_user -d virtual_hospital_platform -f "src/SQL Queries/resetDemoData.sql"
-```
+The server validates `JWT_SECRET`, `ENCRYPTION_KEY`, and the database mode's required variables at boot, and exits immediately with a clear error if any are missing.
 
 ---
 
 ## Testing
 
-Create a `.env.test` file in the project root. At minimum it needs `NODE_ENV=test` and a test database URL.
-
 ```bash
-# Run all tests
-npm test
-
-# Watch mode
-npm run watch
-
-# Coverage report
-npm run coverage
+npm test          # run the full suite once
+npm run watch      # watch mode
+npm run coverage   # coverage report
 ```
 
-Coverage is collected from `src/{config,controllers,middleware,routes,utils,validators}`.
+Point `.env.test` at a separate database (e.g. `helixacare_test`) before running — integration tests hit a real database.
 
 ---
 
@@ -183,94 +234,48 @@ Swagger UI is served at:
 http://localhost:5000/api-docs
 ```
 
-It is also accessible through the admin dashboard.
-
----
-
-## API Route Map
-
-| Prefix | Description |
-|--------|-------------|
-| `POST /api/auth` | Register, login, OAuth callbacks, password reset |
-| `GET/PUT /api/profile` | Authenticated user profile |
-| `GET /api/dashboard` | Role-aware dashboard data |
-| `/api/admin/*` | Admin operations (appointments, billing, stats, charts, plans, insurance, time slots) |
-| `/api/adminBoard/*` | Raw CRUD board for all database entities |
-| `/api/doctor/*` | Doctor profile, appointments, time slots, subscriptions |
-| `/api/patient/*` | Patient profile and appointments |
-| `/api/medical-records` | Upload and retrieve medical records |
-| `/api/prescriptions` | Create and view prescriptions |
-| `/api/files` | File upload/download |
-| `/api/pharmacy-orders` | Pharmacy order management |
-| `/api/medications` | Medication catalogue |
-| `/api/payments/*` | Billing, subscriptions, PayPal, webhooks |
-| `/api/questions` | Patient health assessments and doctor responses |
-| `/api/insurance-requests` | Insurance request lifecycle |
-| `/api/support-tickets` | Patient support ticket management |
-
 ---
 
 ## Project Structure
 
 ```
 virtual-hospital-platform/
-├── public/                     # Static HTML pages served to the browser
+├── frontend/                       # React (Vite) SPA
+│   └── src/
+│       ├── api/                    # Axios modules, one per backend resource
+│       ├── components/
+│       │   ├── layout/             # Sidebar, Topbar, AppLayout
+│       │   └── ui/                 # Reusable UI primitives
+│       ├── contexts/                # Auth & theme context providers
+│       ├── hooks/                   # useFetch, usePaginatedFetch, useTheme, ...
+│       ├── pages/
+│       │   ├── admin/               # Admin dashboards & management pages
+│       │   ├── doctor/              # Doctor portal pages
+│       │   ├── patient/             # Patient portal pages
+│       │   ├── auth/                # Login / register
+│       │   └── shared/              # Messages, notifications, profile
+│       ├── router/                  # Route definitions & role guards
+│       └── utils/
 │
-├── src/
-│   ├── app.js                  # Express app — middleware & route registration
-│   ├── config/
-│   │   ├── db.js               # PostgreSQL connection pool (Neon + local modes)
-│   │   ├── swagger.js          # Swagger / OpenAPI spec config
-│   │   └── jest.config.js      # Jest configuration
-│   │
-│   ├── controllers/
-│   │   ├── admin/              # Admin-specific business logic
-│   │   ├── authentication/     # Auth, JWT, OAuth strategies
-│   │   ├── databaseAdminBoard/ # Raw CRUD controllers for the admin board
-│   │   ├── doctor/             # Doctor workflows
-│   │   ├── patient/            # Patient workflows
-│   │   ├── payments/           # Billing, PayPal, subscriptions, webhooks
-│   │   ├── Files/              # File upload/download
-│   │   ├── insurance/          # Insurance requests
-│   │   ├── medicalRecords/     # Medical record management
-│   │   ├── medications/        # Medication catalogue
-│   │   ├── PharmacyOrders/     # Pharmacy order processing
-│   │   ├── prescriptions/      # Prescription management
-│   │   ├── profile/            # User profile updates
-│   │   ├── questions/          # Patient health question bank
-│   │   └── supportTickets/     # Support ticket system
-│   │
-│   ├── middleware/
-│   │   ├── verifyToken.js      # JWT verification
-│   │   ├── requireRole.js      # Role-based access control
-│   │   ├── checkPlanFeature.js # Doctor subscription plan feature gating
-│   │   ├── rateLimit.js        # Rate limiters (login, OTP, general)
-│   │   ├── uploadMiddleware.js # Multer configuration
-│   │   └── fileValidator.js    # Uploaded file type/size validation
-│   │
-│   ├── routes/                 # Express routers (mirrors controllers structure)
-│   │
+├── src/                             # Express backend
+│   ├── app.js                       # Middleware & route registration
+│   ├── config/                      # DB pool, Swagger config
+│   ├── controllers/                 # One folder per domain area
+│   │   └── databaseAdminBoard/      # Generic CRUD controllers backing the admin board
+│   ├── middleware/                  # Auth, RBAC, rate limiting, uploads
+│   ├── routes/                      # Express routers (mirrors controllers/)
 │   ├── SQL Queries/
-│   │   ├── ProductionSetup.sql # Full schema + seed for production
-│   │   └── resetDemoData.sql   # Reset to demo data
-│   │
-│   ├── utils/
-│   │   ├── encrypt.js          # Encryption helpers
-│   │   ├── pagination.js       # Reusable pagination utility
-│   │   └── paypalClient.js     # PayPal SDK client initialisation
-│   │
-│   └── validators/             # express-validator rule sets
-│       ├── appointmentsValidation.js
-│       ├── prescriptionsValidation.js
-│       └── questionsValidation.js
+│   │   ├── ProductionSetup.sql      # Full schema + seed data
+│   │   └── resetDemoData.sql        # Reset to clean demo data (re-runnable)
+│   ├── utils/                       # Encryption, pagination, error handling
+│   └── validators/                  # express-validator rule sets
 │
 ├── tests/
-│   ├── unit/                   # Unit tests
-│   ├── integration/            # Integration tests (hits real DB)
-│   └── __mocks__/              # Jest manual mocks
+│   ├── unit/
+│   └── integration/                 # Hits a real database
 │
-├── index.js                    # Server entry point
-├── env.example                 # Environment variable template
+├── server.js                        # Server entry point
+├── env.example                      # Backend environment variable template
 └── package.json
 ```
 
@@ -278,26 +283,25 @@ virtual-hospital-platform/
 
 ## Security
 
-- **JWT** — short-lived tokens verified on every protected route
-- **Helmet** — sets secure HTTP headers in production with a strict CSP
-- **HTTPS redirect** — enforced in production behind a proxy (Render, NGINX, etc.)
-- **Rate limiting** — brute-force protection on login (5 req/min) and OTP (3 req/10 min) endpoints
-- **bcrypt** — passwords hashed before storage
-- **express-validator** — all user inputs validated at the boundary
-- **Plan feature gating** — doctor features locked behind subscription tier checks
-- **CORS** — restricted to configured origins only
+- **JWT** — verified on every protected route, with a revocation blacklist so logout is real
+- **AES-256-GCM** — sensitive record content (medical record descriptions, prescription instructions) encrypted at rest
+- **Database-level constraints** — a PostgreSQL exclusion constraint prevents doctor double-booking even under concurrent requests, not just an application-level check
+- **Helmet** — secure HTTP headers, strict CSP in production
+- **HTTPS redirect** — enforced in production behind a reverse proxy (Render, NGINX, etc.)
+- **Rate limiting** — brute-force protection on login and general API traffic
+- **bcrypt** — password hashing
+- **express-validator** — input validation at every route boundary
+- **CORS** — restricted to explicitly configured origins
+- **Role-based access control** — enforced in middleware, with explicit ownership checks on patient/doctor-scoped resources
 
 ---
 
-## Default Admin Credentials
+## Scope Note
 
-```
-Email:    admin@virtualhospitalplatform.com
-Password: admin123  (stored as bcrypt hash in the DB)
-```
+This is a proof-of-concept build demonstrating the technical feasibility of an integrated virtual hospital platform. It is not a certified medical product — diagnosis and treatment remain the responsibility of qualified practitioners; AVA is a triage-and-navigation aid, not a diagnostic tool.
 
 ---
 
 ## License
 
-Proprietary — licensed by the Virtual Hospital Platform team.
+Proprietary.
