@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getDoctorAppointments, updateAppointmentStatus, rescheduleDoctorAppointment } from '@/api/appointments';
+import { createFollowUp } from '@/api/followUps';
 import usePaginatedFetch from '@/hooks/usePaginatedFetch';
 import Card from '@/components/ui/Card';
 import Badge, { statusVariant } from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import Select from '@/components/ui/Select';
 import Input from '@/components/ui/Input';
 import Spinner from '@/components/ui/Spinner';
 import EmptyState from '@/components/ui/EmptyState';
@@ -14,12 +14,11 @@ import ErrorState from '@/components/ui/ErrorState';
 import PageHeader from '@/components/ui/PageHeader';
 import Pagination from '@/components/ui/Pagination';
 import Avatar from '@/components/ui/Avatar';
-import { Calendar, Search, Plus, Clock, User, FileText } from 'lucide-react';
+import { Calendar, Search, Plus, Clock, User, FileText, CheckCircle, X } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
-const STATUS_OPTIONS = ['pending', 'confirmed', 'completed', 'cancelled'];
 const FILTER_OPTIONS = ['all', 'upcoming', 'confirmed', 'in-progress', 'completed', 'pending'];
 const TYPE_FILTER_OPTIONS = ['all', 'consultation', 'follow_up', 'triage_escalation'];
 const TYPE_LABEL = { consultation: 'Consultation', follow_up: 'Follow-up', triage_escalation: 'Escalated' };
@@ -39,7 +38,27 @@ const Appointments = () => {
   const [newEndTime, setNewEndTime] = useState('');
   const [rescheduling, setRescheduling] = useState(false);
 
+  // Consultation-outcome capture — only intercepts the transition to
+  // 'completed' on a non-follow_up appointment. Follow-up completion has
+  // its own separate, correct lifecycle via completeFollowUp on the
+  // Follow-Ups page, so this must never fire for appointment_type ===
+  // 'follow_up'. pendingStatus exists because the status Badge is otherwise
+  // fully controlled off detailModal.status — without it, clicking "Mark
+  // Completed" would visually snap back to the old status while this form is open.
+  const [pendingStatus, setPendingStatus] = useState(null);
+  const [outcomeNotes, setOutcomeNotes] = useState('');
+  const [scheduleFollowUp, setScheduleFollowUp] = useState(false);
+  const [followUpDate, setFollowUpDate] = useState('');
+  const [followUpNotes, setFollowUpNotes] = useState('');
+  const [savingOutcome, setSavingOutcome] = useState(false);
+
   const canReschedule = (status) => status !== 'completed' && status !== 'cancelled';
+
+  const defaultFollowUpDate = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().split('T')[0];
+  };
 
   const handleStatusChange = async (id, status) => {
     setUpdating(id);
@@ -48,10 +67,69 @@ const Appointments = () => {
       toast.success('Status updated');
       setDetailModal((m) => (m && m.id === id ? { ...m, status } : m));
       refetch();
-    } catch {
-      toast.error('Failed to update status');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update status');
     } finally {
       setUpdating(null);
+    }
+  };
+
+  // Only ever called with 'completed' (from the Mark Completed button) —
+  // kept as its own function, rather than inlined into that button's
+  // onClick, so the follow_up-type guard lives in one place.
+  const handleStatusSelect = (id, status, appointmentType) => {
+    if (status === 'completed' && appointmentType !== 'follow_up') {
+      setPendingStatus('completed');
+      setOutcomeNotes('');
+      setScheduleFollowUp(false);
+      setFollowUpDate(defaultFollowUpDate());
+      setFollowUpNotes('');
+      return;
+    }
+    setPendingStatus(null);
+    handleStatusChange(id, status);
+  };
+
+  const handleCompleteWithOutcome = async (appt) => {
+    setSavingOutcome(true);
+    try {
+      await updateAppointmentStatus(appt.id, {
+        status: 'completed',
+        // undefined (not '') for an empty textarea, so axios drops the key
+        // and the backend's COALESCE leaves any prior value untouched
+        // instead of overwriting it with blank.
+        outcome_notes: outcomeNotes.trim() || undefined,
+      });
+      setDetailModal((m) => (m && m.id === appt.id ? { ...m, status: 'completed' } : m));
+      setPendingStatus(null);
+
+      if (scheduleFollowUp) {
+        if (!followUpDate) {
+          toast.error('Marked completed, but a follow-up date is required to schedule one.');
+        } else {
+          try {
+            await createFollowUp({
+              patient_id: appt.patient_id,
+              scheduled_date: followUpDate,
+              notes: followUpNotes.trim() || undefined,
+            });
+            toast.success('Marked completed and follow-up scheduled');
+          } catch (err) {
+            // The status update already succeeded — this is a distinct,
+            // partial failure, not an overall one. Say so explicitly rather
+            // than a generic error that could read as the whole action
+            // having failed.
+            toast.error(`Marked completed, but the follow-up could not be scheduled: ${err.response?.data?.error || 'unknown error'}`);
+          }
+        }
+      } else {
+        toast.success('Marked completed');
+      }
+      refetch();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update status');
+    } finally {
+      setSavingOutcome(false);
     }
   };
 
@@ -193,13 +271,24 @@ const Appointments = () => {
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => setDetailModal(appt)} className="hover:border-brand-600 hover:text-brand-600">
+                          <Button variant="ghost" size="sm" onClick={() => { setPendingStatus(null); setDetailModal(appt); }} className="hover:border-brand-600 hover:text-brand-600">
                             View
                           </Button>
-                          {canReschedule(appt.status) && (
-                            <Button variant="ghost" size="sm" onClick={() => openReschedule(appt)} className="hover:border-brand-600 hover:text-brand-600">
-                              Reschedule
-                            </Button>
+                          {/* Reschedule/status here go through generic endpoints the
+                              backend now rejects for follow-up rows — those have
+                              their own dedicated lifecycle on the Follow-Ups page. */}
+                          {appt.appointment_type === 'follow_up' ? (
+                            canReschedule(appt.status) && (
+                              <Button variant="ghost" size="sm" onClick={() => navigate('/doctor/follow-ups')} className="hover:border-brand-600 hover:text-brand-600">
+                                Follow-Ups
+                              </Button>
+                            )
+                          ) : (
+                            canReschedule(appt.status) && (
+                              <Button variant="ghost" size="sm" onClick={() => openReschedule(appt)} className="hover:border-brand-600 hover:text-brand-600">
+                                Reschedule
+                              </Button>
+                            )
                           )}
                         </div>
                       </td>
@@ -215,7 +304,7 @@ const Appointments = () => {
 
       {/* Detail Modal */}
       {detailModal && (
-        <Modal isOpen={!!detailModal} onClose={() => setDetailModal(null)} title={`Appointment #${detailModal.id}`}>
+        <Modal isOpen={!!detailModal} onClose={() => { setPendingStatus(null); setDetailModal(null); }} title={`Appointment #${detailModal.id}`}>
           <div className="space-y-4">
             <Badge variant={TYPE_VARIANT[detailModal.appointment_type] || 'default'}>{TYPE_LABEL[detailModal.appointment_type] || 'Consultation'}</Badge>
             <div>
@@ -243,23 +332,98 @@ const Appointments = () => {
                 </div>
               </div>
             )}
+            {detailModal.status === 'completed' && detailModal.outcome_notes && pendingStatus !== 'completed' && (
+              <div>
+                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">Outcome Notes</p>
+                <div className="flex items-start gap-2 text-sm text-text-secondary">
+                  <FileText size={16} className="text-brand-600 mt-0.5 flex-shrink-0" />
+                  <p className="whitespace-pre-wrap">{detailModal.outcome_notes}</p>
+                </div>
+              </div>
+            )}
             <div>
               <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">Status</p>
-              <Select
-                value={detailModal.status}
-                onChange={(e) => handleStatusChange(detailModal.id, e.target.value)}
-                disabled={updating === detailModal.id}
-              >
-                {STATUS_OPTIONS.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </Select>
+              {detailModal.appointment_type === 'follow_up' ? (
+                <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-surface-subtle border border-slate-200">
+                  <Badge variant={statusVariant(detailModal.status)}>{detailModal.status}</Badge>
+                  <Button size="sm" variant="secondary" onClick={() => navigate('/doctor/follow-ups')}>
+                    Manage in Follow-Ups
+                  </Button>
+                </div>
+              ) : (
+                <Badge variant={statusVariant(pendingStatus ?? detailModal.status)}>{pendingStatus ?? detailModal.status}</Badge>
+              )}
             </div>
-            {canReschedule(detailModal.status) && (
-              <Button variant="secondary" className="w-full" onClick={() => openReschedule(detailModal)}>
-                <Clock size={16} className="mr-2" />
-                Reschedule
-              </Button>
+
+            {/* Consultation-outcome capture — rendered inline inside this
+                same Modal, never as a nested one: Modal.jsx locks/unlocks
+                page scroll on mount/unmount, so closing an inner modal
+                would incorrectly unlock scroll while this outer one stays open. */}
+            {pendingStatus === 'completed' && (
+              <div className="space-y-3 p-3 rounded-lg bg-blue-50 border border-blue-200">
+                <p className="text-xs font-medium text-blue-900">Record the outcome of this consultation.</p>
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1.5">Outcome Notes (optional)</label>
+                  <textarea
+                    rows={3}
+                    value={outcomeNotes}
+                    onChange={(e) => setOutcomeNotes(e.target.value)}
+                    className="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-300"
+                    placeholder="e.g. Patient responded well to treatment, advised rest for 3 days…"
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-sm text-text-primary">
+                  <input type="checkbox" checked={scheduleFollowUp} onChange={(e) => setScheduleFollowUp(e.target.checked)} />
+                  Schedule a follow-up for this patient
+                </label>
+                {scheduleFollowUp && (
+                  <div className="space-y-2 pl-6">
+                    <Input label="Follow-Up Date" type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} />
+                    <div>
+                      <label className="block text-xs font-semibold text-text-secondary mb-1.5">Follow-Up Notes (optional)</label>
+                      <textarea
+                        rows={2}
+                        value={followUpNotes}
+                        onChange={(e) => setFollowUpNotes(e.target.value)}
+                        className="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-300"
+                      />
+                    </div>
+                  </div>
+                )}
+                <div className="flex gap-2 pt-1">
+                  <Button size="sm" variant="secondary" onClick={() => setPendingStatus(null)} disabled={savingOutcome}>
+                    Cancel
+                  </Button>
+                  <Button size="sm" onClick={() => handleCompleteWithOutcome(detailModal)} isLoading={savingOutcome}>
+                    Save
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Button row instead of a raw status dropdown, matching the
+                Follow-Ups detail modal's layout. Appointments have one extra
+                state follow-ups don't (confirmed), so pending gets a Confirm
+                step first; confirmed is what actually offers Mark Completed. */}
+            {canReschedule(detailModal.status) && pendingStatus !== 'completed' && detailModal.appointment_type !== 'follow_up' && (
+              <div className="flex gap-2 pt-2">
+                {detailModal.status === 'pending' && (
+                  <Button isLoading={updating === detailModal.id} onClick={() => handleStatusChange(detailModal.id, 'confirmed')} className="flex-1">
+                    <CheckCircle size={16} className="mr-2" /> Confirm
+                  </Button>
+                )}
+                {detailModal.status === 'confirmed' && (
+                  <Button onClick={() => handleStatusSelect(detailModal.id, 'completed', detailModal.appointment_type)} className="flex-1">
+                    <CheckCircle size={16} className="mr-2" /> Mark Completed
+                  </Button>
+                )}
+                <Button variant="secondary" onClick={() => { const appt = detailModal; setDetailModal(null); openReschedule(appt); }} className="flex-1">
+                  <Clock size={16} className="mr-2" /> Reschedule
+                </Button>
+                <Button variant="secondary" isLoading={updating === detailModal.id} onClick={() => handleStatusChange(detailModal.id, 'cancelled')} className="flex-1 text-red-600 hover:bg-red-50">
+                  <X size={16} className="mr-2" /> Cancel
+                </Button>
+              </div>
             )}
           </div>
         </Modal>

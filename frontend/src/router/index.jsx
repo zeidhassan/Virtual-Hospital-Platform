@@ -54,6 +54,8 @@ const PatientInsuranceRequests = () => lazy_(() => import('@/pages/patient/Insur
 const PatientSupportTickets = () => lazy_(() => import('@/pages/patient/SupportTickets'));
 const PatientHealthLogs = () => lazy_(() => import('@/pages/patient/HealthLogs'));
 const PatientConsultationHistory = () => lazy_(() => import('@/pages/patient/ConsultationHistory'));
+const MyFollowUps = () => lazy_(() => import('@/pages/patient/MyFollowUps'));
+const PatientHealthPrograms = () => lazy_(() => import('@/pages/patient/HealthPrograms'));
 
 // Doctor pages
 const DoctorDashboard = () => lazy_(() => import('@/pages/doctor/DoctorDashboard'));
@@ -70,6 +72,7 @@ const DoctorInsurance = () => lazy_(() => import('@/pages/doctor/Insurance'));
 const EscalatedTriage = () => lazy_(() => import('@/pages/doctor/EscalatedTriage'));
 const DoctorPatientTimeline = () => lazy_(() => import('@/pages/doctor/PatientTimeline'));
 const DoctorPharmacyOrders = () => lazy_(() => import('@/pages/doctor/PharmacyOrders'));
+const DoctorFollowUps = () => lazy_(() => import('@/pages/doctor/FollowUps'));
 
 // Admin pages
 const AdminDashboard = () => lazy_(() => import('@/pages/admin/AdminDashboard'));
@@ -78,6 +81,7 @@ const AdminBilling = () => lazy_(() => import('@/pages/admin/Billing'));
 const AdminStats = () => lazy_(() => import('@/pages/admin/Stats'));
 const AdminCharts = () => lazy_(() => import('@/pages/admin/Charts'));
 const AdminAppointments = () => lazy_(() => import('@/pages/admin/Appointments'));
+const AdminFollowUps = () => lazy_(() => import('@/pages/admin/FollowUps'));
 const AdminDoctorPlans = () => lazy_(() => import('@/pages/admin/DoctorPlans'));
 const AdminDoctorSubscriptions = () => lazy_(() => import('@/pages/admin/DoctorSubscriptions'));
 const AdminDoctorTimeSlots = () => lazy_(() => import('@/pages/admin/DoctorTimeSlots'));
@@ -131,6 +135,8 @@ export const router = createBrowserRouter([
       { path: '/patient/dashboard', element: <PatientDashboard /> },
       { path: '/patient/book-appointment', element: <BookAppointment /> },
       { path: '/patient/my-appointments', element: <MyAppointments /> },
+      { path: '/patient/my-follow-ups', element: <MyFollowUps /> },
+      { path: '/patient/health-programs', element: <PatientHealthPrograms /> },
       { path: '/patient/medical-records', element: <PatientMedicalRecords /> },
       { path: '/patient/prescriptions', element: <PatientPrescriptions /> },
       { path: '/patient/place-order', element: <PlaceOrder /> },
@@ -160,6 +166,7 @@ export const router = createBrowserRouter([
       { path: '/doctor/dashboard', element: <DoctorDashboard /> },
       { path: '/doctor/patients', element: <ViewPatients /> },
       { path: '/doctor/appointments', element: <DoctorAppointments /> },
+      { path: '/doctor/follow-ups', element: <DoctorFollowUps /> },
       { path: '/doctor/medical-records', element: <DoctorMedicalRecords /> },
       { path: '/doctor/prescriptions', element: <DoctorPrescriptions /> },
       { path: '/doctor/patient-answers', element: <PatientAnswers /> },
@@ -189,6 +196,7 @@ export const router = createBrowserRouter([
       { path: '/admin/stats', element: <AdminStats /> },
       { path: '/admin/charts', element: <AdminCharts /> },
       { path: '/admin/appointments', element: <AdminAppointments /> },
+      { path: '/admin/follow-ups', element: <AdminFollowUps /> },
       { path: '/admin/doctor-plans', element: <AdminDoctorPlans /> },
       { path: '/admin/doctor-subscriptions', element: <AdminDoctorSubscriptions /> },
       { path: '/admin/doctor-time-slots', element: <AdminDoctorTimeSlots /> },

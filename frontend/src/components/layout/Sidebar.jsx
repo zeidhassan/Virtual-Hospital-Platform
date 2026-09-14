@@ -17,6 +17,7 @@ const PATIENT_NAV = [
   { group: 'Healthcare', items: [
     { to: '/patient/book-appointment', label: 'Book Appointment', icon: CalendarPlus },
     { to: '/patient/my-appointments', label: 'My Appointments', icon: CalendarCheck },
+    { to: '/patient/my-follow-ups', label: 'Follow-Ups', icon: Calendar },
     { to: '/patient/medical-records', label: 'Medical Records', icon: FileText },
     { to: '/patient/prescriptions', label: 'Prescriptions', icon: Pill },
   ]},
@@ -32,6 +33,7 @@ const PATIENT_NAV = [
   ]},
   { group: 'Care', items: [
     { to: '/patient/health-logs', label: 'Health Logs', icon: Activity },
+    { to: '/patient/health-programs', label: 'Health Programs', icon: Stethoscope },
     { to: '/patient/consultation-history', label: 'Care Timeline', icon: Heart },
     { to: '/patient/answer-questions', label: 'Health Questions', icon: HelpCircle },
     { to: '/patient/my-answers', label: 'My Answers', icon: MessageSquare },
@@ -50,6 +52,7 @@ const DOCTOR_NAV = [
   { group: 'Patients', items: [
     { to: '/doctor/patients', label: 'My Patients', icon: Users },
     { to: '/doctor/appointments', label: 'Appointments', icon: Calendar },
+    { to: '/doctor/follow-ups', label: 'Follow-Ups', icon: CalendarCheck },
     { to: '/doctor/medical-records', label: 'Medical Records', icon: FileText },
     { to: '/doctor/prescriptions', label: 'Prescriptions', icon: Pill },
     { to: '/doctor/pharmacy-orders', label: 'Pharmacy Orders', icon: Package },
@@ -77,6 +80,7 @@ const ADMIN_NAV = [
   ]},
   { group: 'Operations', items: [
     { to: '/admin/appointments', label: 'Appointments', icon: CalendarCheck },
+    { to: '/admin/follow-ups', label: 'Follow-Ups', icon: CalendarPlus },
     { to: '/admin/consultation-history', label: 'Consultation History', icon: Heart },
     { to: '/admin/billing', label: 'Billing', icon: CreditCard },
     { to: '/admin/orders', label: 'Pharmacy Orders', icon: Package },

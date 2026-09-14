@@ -96,7 +96,8 @@ exports.getTimeline = async (req, res) => {
             'appointment_end_time', appointment_end_time,
             'notes', notes,
             'doctor_id', doctor_id,
-            'appointment_type', appointment_type
+            'appointment_type', appointment_type,
+            'outcome_notes', outcome_notes
           ) AS details
         FROM appointments
         WHERE patient_id = $${p} AND appointment_type IN ('consultation', 'triage_escalation')${dateFilter('appointment_date::timestamp')}
@@ -147,7 +148,8 @@ exports.getTimeline = async (req, res) => {
             'notes', notes,
             'scheduled_date', appointment_date,
             'doctor_id', doctor_id,
-            'reminder_sent', reminder_sent
+            'reminder_sent', reminder_sent,
+            'outcome_notes', outcome_notes
           ) AS details
         FROM appointments
         WHERE patient_id = $${p} AND appointment_type = 'follow_up'${dateFilter('appointment_date::timestamp')}

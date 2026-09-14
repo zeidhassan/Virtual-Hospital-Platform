@@ -159,6 +159,10 @@ exports.reassignAppointment = async (req, res) => {
     }
     const appt = apptResult.rows[0];
 
+    if (appt.appointment_type === 'follow_up') {
+      return res.status(400).json({ error: 'This is a follow-up appointment — manage it from the Follow-Ups page.' });
+    }
+
     if (['completed', 'cancelled'].includes(appt.status)) {
       return res.status(400).json({ error: `Cannot reassign an appointment with status '${appt.status}'.` });
     }
@@ -236,6 +240,10 @@ exports.updateAppointment = async (req, res) => {
       return res.status(404).json({ error: 'Appointment not found.' });
     }
     const existing = existingResult.rows[0];
+
+    if (existing.appointment_type === 'follow_up') {
+      return res.status(400).json({ error: 'This is a follow-up appointment — manage it from the Follow-Ups page.' });
+    }
 
     const isReschedule = !!(appointment_date || appointment_start_time || appointment_end_time);
     const newDate = appointment_date || existing.appointment_date;

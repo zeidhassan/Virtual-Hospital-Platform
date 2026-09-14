@@ -1,5 +1,5 @@
 -- DROP ALL TABLES IF THEY EXIST
-DROP TABLE IF EXISTS patient_insurance, payment_transactions, follow_up_schedules, health_logs, triage_sessions, triage_symptom_rules, token_blacklist, users, doctors, patients, billing_addresses, payment_methods, appointments, doctor_time_slots, appointment_status_logs, prescriptions, medical_records, bills, plans, subscriptions, conversations, conversation_participants, messages, notifications, medications, pharmacy_orders, question_bank, patient_question_responses, doctor_response_notes, question_assignments, doctor_plans, doctor_subscriptions, insurance_requests, support_tickets, support_ticket_replies, services, health_programs, user_passwords CASCADE;
+DROP TABLE IF EXISTS patient_insurance, payment_transactions, follow_up_schedules, health_logs, triage_sessions, triage_symptom_rules, token_blacklist, users, doctors, patients, billing_addresses, payment_methods, appointments, doctor_time_slots, appointment_status_logs, prescriptions, medical_records, bills, plans, subscriptions, conversations, conversation_participants, messages, notifications, medications, pharmacy_orders, question_bank, patient_question_responses, doctor_response_notes, question_assignments, doctor_plans, doctor_subscriptions, insurance_requests, support_tickets, support_ticket_replies, services, health_programs, patient_health_programs, user_passwords CASCADE;
 
 -- Needed for the appointments_no_overlap exclusion constraint below (lets a
 -- GiST index mix a plain equality column with a range-overlap column).
@@ -128,7 +128,8 @@ CREATE TABLE appointments (
     triage_session_id INT,
     reminder_sent BOOLEAN DEFAULT FALSE,
     completed_at TIMESTAMP,
-    created_by INT REFERENCES users(id) ON DELETE SET NULL
+    created_by INT REFERENCES users(id) ON DELETE SET NULL,
+    outcome_notes TEXT
 );
 CREATE INDEX idx_appointments_doctor_date ON appointments (doctor_id, appointment_date);
 CREATE INDEX idx_appointments_patient_date ON appointments (patient_id, appointment_date);
@@ -594,6 +595,15 @@ INSERT INTO health_programs (name, description, start_date, end_date, eligibilit
 ('Flu Vaccination Drive', 'Free flu shots and consultations.', '2025-09-15', '2025-09-30', 'All patients'),
 ('Senior Wellness Program', 'Fitness and health education for seniors.', '2025-12-01', '2025-12-10', 'Seniors 60+'),
 ('Cholesterol Check Camp', 'Free lipid profile and consultation.', '2025-05-15', '2025-05-20', 'Adults 30+');
+
+CREATE TABLE patient_health_programs (
+    id SERIAL PRIMARY KEY,
+    patient_id INT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    health_program_id INT NOT NULL REFERENCES health_programs(id) ON DELETE CASCADE,
+    enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (patient_id, health_program_id)
+);
+CREATE INDEX idx_patient_health_programs_patient ON patient_health_programs(patient_id);
 
 -------------------------------------------------------------------------------------------
 

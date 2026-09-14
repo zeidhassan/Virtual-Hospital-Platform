@@ -23,6 +23,15 @@ exports.createFollowUp = async (req, res) => {
         return res.status(404).json({ error: 'Doctor profile not found' });
       }
       resolvedDoctorId = docRow.rows[0].id;
+
+      // A doctor may only schedule a follow-up for a patient they've actually treated.
+      const link = await pool.query(
+        'SELECT 1 FROM appointments WHERE doctor_id = $1 AND patient_id = $2 LIMIT 1',
+        [resolvedDoctorId, patient_id]
+      );
+      if (link.rows.length === 0) {
+        return res.status(403).json({ error: 'Not your patient.' });
+      }
     } else if (req.body.doctor_id) {
       resolvedDoctorId = req.body.doctor_id;
     }
@@ -179,9 +188,22 @@ exports.getAllFollowUps = async (req, res) => {
     const sort  = req.query.sort || '-appointment_date';
 
     const validFilters = ['patient_id', 'doctor_id', 'status', 'reminder_sent'];
+    // patient_id/doctor_id must be coerced to numbers before reaching paginate():
+    // query-string values are always strings, and paginate() routes any string
+    // that doesn't parse as a date through `LOWER(column) LIKE ...`, which
+    // fails with "function lower(integer) does not exist" against an int column.
+    const NUMERIC_FILTERS = new Set(['patient_id', 'doctor_id']);
     const filters = { 'fs.appointment_type': 'follow_up' };
     for (const key of validFilters) {
-      if (req.query[key] !== undefined) filters[`fs.${key}`] = req.query[key];
+      const raw = req.query[key];
+      if (raw === undefined || raw === '') continue;
+      if (NUMERIC_FILTERS.has(key)) {
+        const n = Number(raw);
+        if (!Number.isInteger(n)) return res.status(400).json({ error: `Invalid ${key}` });
+        filters[`fs.${key}`] = n;
+      } else {
+        filters[`fs.${key}`] = raw;
+      }
     }
 
     const result = await paginate({
@@ -217,6 +239,7 @@ async function getFollowUpById(id) {
 // PUT /api/follow-ups/:id/complete — patient or doctor marks complete
 exports.completeFollowUp = async (req, res) => {
   const { id } = req.params;
+  const { outcome_notes } = req.body || {};
 
   try {
     const fu = await getFollowUpById(id);
@@ -239,8 +262,24 @@ exports.completeFollowUp = async (req, res) => {
       return res.status(400).json({ error: 'Cannot complete a cancelled follow-up' });
     }
 
+    // outcome_notes is a clinical field — only a doctor's value is ever
+    // honored, even if a patient's own completion request happens to
+    // include one (the patient-facing UI never sends this field, but the
+    // API itself shouldn't trust the client's role claim over req.user).
+    if (outcome_notes !== undefined && req.user.role === 'doctor') {
+      if (typeof outcome_notes !== 'string' || outcome_notes.length > 5000) {
+        return res.status(400).json({ error: 'Outcome notes must be text under 5000 characters.' });
+      }
+    }
+    const notesToStore = req.user.role === 'doctor' ? (outcome_notes || null) : null;
+
     const result = await pool.query(
-      `UPDATE appointments SET status = 'completed', completed_at = NOW() WHERE id = $1 RETURNING *, appointment_date AS scheduled_date`, [id]
+      `UPDATE appointments
+       SET status = 'completed',
+           outcome_notes = COALESCE($2, outcome_notes),
+           completed_at = COALESCE(completed_at, NOW())
+       WHERE id = $1 RETURNING *, appointment_date AS scheduled_date`,
+      [id, notesToStore]
     );
 
     // Notify the other party
@@ -468,7 +507,10 @@ exports.assignFollowUp = async (req, res) => {
     if (startTime && endTime) {
       const availability = await validateDoctorAvailability(doctor_id, fu.appointment_date, startTime, endTime, { excludeAppointmentId: fu.id });
       if (!availability.ok) {
-        return res.status(400).json({ error: availability.error });
+        // needsReschedule tells the admin UI to offer the doctor's actual
+        // available slots instead of just showing the error — the same
+        // convention the appointment-reassign flow already uses.
+        return res.status(400).json({ error: availability.error, needsReschedule: true });
       }
     }
 

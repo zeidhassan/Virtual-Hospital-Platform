@@ -1,8 +1,8 @@
 # HelixaCare — Virtual Hospital Platform
 
-A full-stack virtual hospital platform providing AI-assisted triage, teleconsultation, remote patient monitoring, and integrated digital health records — built as a **React (Vite)** frontend on top of a **Node.js / Express** REST API and a **36-table PostgreSQL** database. The system serves three roles — **Patient**, **Doctor**, and **Admin** — each with a dedicated dashboard and role-scoped access to the platform's features.
+A full-stack virtual hospital platform providing AI-assisted triage, teleconsultation, remote patient monitoring, and integrated digital health records — built as a **React (Vite)** frontend on top of a **Node.js / Express** REST API and a **37-table PostgreSQL** database. The system serves three roles — **Patient**, **Doctor**, and **Admin** — each with a dedicated dashboard and role-scoped access to the platform's features.
 
-Validated by **297 automated tests across 31 Jest/Supertest suites**.
+Validated by **554 automated tests across 35 Jest/Supertest suites**.
 
 ---
 
@@ -43,19 +43,21 @@ Validated by **297 automated tests across 31 Jest/Supertest suites**.
 ## Features
 
 ### AVA — AI-Assisted Triage
-- Rule-based symptom classification (routine / urgent / emergency) against an admin-editable keyword table — transparent and traceable by design, not a black-box model
-- Urgent/emergency cases automatically escalate into the doctor's Escalated Triage queue
+- Symptom classification (self-care / standard / urgent / emergency) via a locally-run LLM (Ollama), with an admin-editable keyword-rule engine as an automatic fallback if the LLM is unreachable — triage never goes down just because Ollama isn't running
+- Urgent/emergency cases automatically create a follow-up appointment and notify admins; the doctor's Escalated Triage queue is populated once an admin assigns a reviewing doctor
 - Full triage history per patient
 
 ### Patient
 - Register/login (local + Google/Facebook OAuth), profile management
 - AVA symptom triage, triage history
 - Book, view, and manage appointments (database-level exclusion constraint prevents any double-booking)
+- Follow-up appointments — view, mark complete, or cancel any follow-up a doctor has scheduled
+- Enroll/unenroll in admin-run health programs (chronic-care tracking)
 - Medical records and prescriptions (encrypted at rest), prescription refill requests
 - Pharmacy ordering, order history
 - Billing & payments — mock FPX bank transfer or card, saved payment methods, insurance policy display
 - Insurance claim submission and tracking
-- Chronic-condition health logs and consultation history timeline
+- Chronic-condition health logs and consultation history timeline (including doctor-recorded outcome notes from past consultations)
 - Doctor-assigned health questionnaires
 - Messaging, notifications, support tickets
 
@@ -63,6 +65,8 @@ Validated by **297 automated tests across 31 Jest/Supertest suites**.
 - Dashboard with today's schedule, escalated triage alerts, and quick actions
 - Patient list and full per-patient care timeline
 - Appointment and weekly time-slot management
+- Mark a consultation completed with outcome notes, optionally scheduling a follow-up in the same step
+- Dedicated follow-up management — create, reschedule, complete (with outcome notes), or cancel
 - Write/manage prescriptions, add and edit medical records
 - Review and fulfil pharmacy orders for their own patients
 - Accept/reject patient insurance claims
@@ -73,9 +77,10 @@ Validated by **297 automated tests across 31 Jest/Supertest suites**.
 - Platform-wide analytics dashboard (revenue, appointments, users by role, top doctors/medications) via Recharts
 - Generic Database Admin Board — CRUD access across every core entity, for operational data correction
 - Appointment, billing, and pharmacy order oversight platform-wide
+- Follow-up oversight — assign/reassign a doctor, reschedule, cancel, and batch-process reminders/missed follow-ups across all patients
 - Doctor subscription approval workflow, doctor plan management
 - Insurance claim administration
-- AVA triage rule configuration and triage session auditing
+- AVA triage rule configuration (the keyword-based fallback engine) and triage session auditing
 - Support ticket resolution, shared question bank moderation
 
 ### Platform-Wide
@@ -95,7 +100,8 @@ Validated by **297 automated tests across 31 Jest/Supertest suites**.
 |---|---|
 | Frontend | React 18, Vite, Tailwind CSS, React Router, Recharts |
 | Backend | Node.js, Express, raw `pg` driver (no ORM) |
-| Database | PostgreSQL (local or Neon cloud), 36 relational tables |
+| Database | PostgreSQL (local or Neon cloud), 37 relational tables |
+| AI / LLM | Ollama (local), with rule-based fallback |
 | Auth | JWT, Passport.js (Google & Facebook OAuth) |
 | Payments | Mock FPX / card flow (no live payment gateway) |
 | Encryption | AES-256-GCM for sensitive field content |
@@ -103,7 +109,7 @@ Validated by **297 automated tests across 31 Jest/Supertest suites**.
 | PDF / CSV Export | pdfkit, json2csv |
 | Security | Helmet, express-rate-limit, bcrypt, express-validator |
 | API Docs | Swagger (swagger-jsdoc + swagger-ui-express) |
-| Testing | Jest, Supertest (297 tests / 31 suites) |
+| Testing | Jest, Supertest (554 tests / 35 suites) |
 
 ---
 
@@ -195,6 +201,7 @@ DB_CONN_TIMEOUT_MS=10000
 
 # JWT — required, no fallback (the app will refuse to start without it)
 JWT_SECRET=
+JWT_EXPIRES_IN=1d
 
 # Field-level encryption for sensitive record content — required, 64 hex
 # characters (32 bytes)
@@ -208,9 +215,30 @@ FACEBOOK_CLIENT_SECRET=
 
 # CORS — the frontend origin allowed to call the API
 FRONTEND_ORIGIN=http://localhost:3000
+
+# Ollama — powers AVA's LLM-based triage classification. Optional in the
+# sense that the app still runs and AVA still works without it (falls back
+# to the keyword-rule engine automatically), but Ollama must be installed
+# and running locally with the model below pulled for triage to actually
+# use the LLM.
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+OLLAMA_MODEL=llama3:latest
+OLLAMA_TIMEOUT_MS=45000
 ```
 
 The server validates `JWT_SECRET`, `ENCRYPTION_KEY`, and the database mode's required variables at boot, and exits immediately with a clear error if any are missing.
+
+### Optional: enabling LLM-based triage
+
+AVA works out of the box with no extra setup — if Ollama isn't running, triage silently falls back to the keyword-rule engine. To get the actual LLM classification:
+
+```bash
+# Install Ollama: https://ollama.com
+ollama pull llama3:latest   # or whichever model OLLAMA_MODEL points at
+ollama serve                # starts the local server on 127.0.0.1:11434
+```
+
+No further configuration is needed — the backend picks it up automatically on the next triage request.
 
 ---
 
@@ -267,6 +295,7 @@ virtual-hospital-platform/
 │   ├── SQL Queries/
 │   │   ├── ProductionSetup.sql      # Full schema + seed data
 │   │   └── resetDemoData.sql        # Reset to clean demo data (re-runnable)
+│   ├── services/                    # External-integration logic (Ollama LLM calls)
 │   ├── utils/                       # Encryption, pagination, error handling
 │   └── validators/                  # express-validator rule sets
 │

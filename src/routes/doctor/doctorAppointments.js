@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const doctorAppointmentsController = require('../../controllers/doctor/doctorAppointmentsController');
 const { validateDoctorPrescription } = require('../../validators/prescriptionsValidation')
+const { validateUpdateAppointmentStatus } = require('../../validators/appointmentsValidation')
 const verifyToken = require('../../middleware/verifyToken');
 
 router.use(verifyToken);
@@ -91,7 +92,7 @@ router.get('/medical-records/:appointmentId', doctorAppointmentsController.getAp
  *       404:
  *         description: Appointment not found
  */
-router.put('/:id/status', doctorAppointmentsController.updateAppointmentStatus);
+router.put('/:id/status', validateUpdateAppointmentStatus, doctorAppointmentsController.updateAppointmentStatus);
 
 /**
  * @swagger

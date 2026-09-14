@@ -81,6 +81,10 @@ exports.rescheduleAppointment = async (req, res) => {
     if (appointmentCheck.rows.length === 0) return res.status(403).json({ error: 'Unauthorized.' });
     const existing = appointmentCheck.rows[0];
 
+    if (existing.appointment_type === 'follow_up') {
+      return res.status(400).json({ error: 'This is a follow-up appointment — manage it from the Follow-Ups page.' });
+    }
+
     if (['completed', 'cancelled'].includes(existing.status)) {
       return res.status(400).json({ error: `Cannot reschedule an appointment with status '${existing.status}'.` });
     }
@@ -132,7 +136,7 @@ exports.updateAppointmentStatus = async (req, res) => {
   try {
     const userId = req.user.id;
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, outcome_notes } = req.body;
 
     const doctorResult = await pool.query('SELECT id FROM doctors WHERE user_id = $1', [userId]);
     if (doctorResult.rows.length === 0) return res.status(404).json({ error: 'Doctor not found.' });
@@ -140,8 +144,23 @@ exports.updateAppointmentStatus = async (req, res) => {
 
     const appointmentCheck = await pool.query('SELECT * FROM appointments WHERE id = $1 AND doctor_id = $2', [id, doctorId]);
     if (appointmentCheck.rows.length === 0) return res.status(403).json({ error: 'Unauthorized.' });
+    if (appointmentCheck.rows[0].appointment_type === 'follow_up') {
+      return res.status(400).json({ error: 'This is a follow-up appointment — manage it from the Follow-Ups page.' });
+    }
 
-    await pool.query('UPDATE appointments SET status = $1 WHERE id = $2', [status, id]);
+    // isCompleting is computed in JS, not re-derived from $1 in SQL — reusing
+    // the same parameter both as the assigned status (implicitly varchar,
+    // from the column) and cast to ::text in a CASE condition makes Postgres
+    // throw "inconsistent types deduced for parameter" (42P08).
+    const isCompleting = status === 'completed';
+    await pool.query(
+      `UPDATE appointments
+       SET status = $1,
+           outcome_notes = COALESCE($2, outcome_notes),
+           completed_at = CASE WHEN $4 THEN COALESCE(completed_at, NOW()) ELSE completed_at END
+       WHERE id = $3`,
+      [status, outcome_notes || null, id, isCompleting]
+    );
 
     // Notification logic
     const patientId = appointmentCheck.rows[0].patient_id;

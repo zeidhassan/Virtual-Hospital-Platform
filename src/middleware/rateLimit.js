@@ -31,7 +31,7 @@ const generalApiLimiter = rateLimit({
   skip: () => process.env.NODE_ENV === 'test', // disable in test env — the suite makes far more than 300 requests per run
 });
 
-// Triage assess endpoint — strict to prevent abuse
+// Triage assess endpoint (AVA) — strict to prevent abuse
 const triageLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10,

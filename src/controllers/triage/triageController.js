@@ -1,11 +1,15 @@
 const pool = require('../../config/db');
 const paginate = require('../../utils/pagination');
+const { classifySymptomsWithOllama } = require('../../services/ollamaTriageService');
 
 // Urgency priority map (lower = higher priority)
 const URGENCY_PRIORITY = { emergency: 1, urgent: 2, standard: 3, self_care: 4 };
 
-// Classify symptoms against DB rules; returns highest-priority match
-async function classifySymptoms(symptomsText) {
+// Rule-based keyword match — was AVA's primary classifier; now kept only as
+// an automatic fallback for when the LLM is unreachable or returns something
+// unusable, so the triage feature stays available during an Ollama outage
+// rather than every assessment failing outright.
+async function classifySymptomsByRules(symptomsText) {
   const { rows: rules } = await pool.query(
     `SELECT * FROM triage_symptom_rules
      ORDER BY CASE urgency_level
@@ -42,6 +46,20 @@ async function classifySymptoms(symptomsText) {
     recommended_action: best.recommended_action,
     recommended_department: best.recommended_department
   };
+}
+
+// AVA's real classifier: the LLM is primary, the keyword rules above are the
+// fallback. Anything that goes wrong with the LLM call — Ollama down,
+// timeout, malformed/unsupported JSON — falls straight through to the
+// existing rule-based path rather than failing the whole assessment, so a
+// patient can always get a triage result even during an Ollama outage.
+async function classifySymptoms(symptomsText) {
+  try {
+    return await classifySymptomsWithOllama(symptomsText);
+  } catch (err) {
+    console.error('[Triage] Ollama classification failed, falling back to rule-based classification:', err.message);
+    return classifySymptomsByRules(symptomsText);
+  }
 }
 
 async function getPatientByUserId(userId) {

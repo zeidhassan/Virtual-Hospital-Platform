@@ -7,7 +7,14 @@ const dotenvPath = path.resolve(
   process.cwd(),
   process.env.NODE_ENV === 'test' ? '.env.test' : '.env'
 );
-require('dotenv').config({ path: dotenvPath });
+// override: true is required — jest.config.js's setupFiles loads the plain
+// .env first (dotenv/config with no path), and dotenv's default behavior is
+// to never overwrite a variable already present in process.env. Without
+// this, NODE_ENV=test test runs would silently keep every .env value
+// (including DB_DATABASE) and connect to the dev database instead of
+// .env.test's helixacare_test, despite this file's own log line claiming
+// otherwise.
+require('dotenv').config({ path: dotenvPath, override: true });
 
 /**
  * Modes:

@@ -1,5 +1,6 @@
 const request = require('supertest');
 const app = require('../../src/app');
+const pool = require('../../src/config/db');
 
 describe('Section 4 - Doctor Portal Integration Tests', () => {
   let doctorToken;
@@ -111,6 +112,146 @@ describe('Section 4 - Doctor Portal Integration Tests', () => {
         .set('Authorization', `Bearer ${patientToken}`)
         .send({ status: 'confirmed' });
       expect([401, 403]).toContain(res.statusCode);
+    });
+
+    it('rejects an invalid status value with 400', async () => {
+      const listRes = await request(app)
+        .get('/api/doctor/appointments')
+        .set('Authorization', `Bearer ${doctorToken}`);
+      const appointments = listRes.body.data;
+      if (appointments.length === 0) return;
+
+      const res = await request(app)
+        .put(`/api/doctor/appointments/${appointments[0].id}/status`)
+        .set('Authorization', `Bearer ${doctorToken}`)
+        .send({ status: 'bogus' });
+      expect(res.statusCode).toBe(400);
+      expect(typeof res.body.error).toBe('string');
+      expect(res.body.error.length).toBeGreaterThan(0);
+    });
+
+    describe('outcome_notes capture on completion', () => {
+      let throwawayAppointmentId;
+
+      beforeAll(async () => {
+        const patientRow = await pool.query(
+          "SELECT p.id FROM patients p JOIN users u ON u.id = p.user_id WHERE u.email = 'jane@helixacare.com'"
+        );
+        const patientId = patientRow.rows[0]?.id;
+
+        const future = new Date();
+        future.setDate(future.getDate() + 30);
+        const dateString = future.toISOString().split('T')[0];
+
+        const res = await request(app)
+          .post('/api/doctor/appointments')
+          .set('Authorization', `Bearer ${doctorToken}`)
+          .send({
+            patient_id: patientId,
+            appointment_date: dateString,
+            appointment_start_time: '16:00',
+            appointment_end_time: '16:30',
+            notes: 'throwaway appointment for outcome_notes test',
+          });
+        throwawayAppointmentId = res.body.id;
+      });
+
+      afterAll(async () => {
+        if (throwawayAppointmentId) {
+          await pool.query('DELETE FROM appointments WHERE id = $1', [throwawayAppointmentId]);
+        }
+      });
+
+      it('persists outcome_notes and stamps completed_at on completion', async () => {
+        if (!throwawayAppointmentId) return;
+
+        const res = await request(app)
+          .put(`/api/doctor/appointments/${throwawayAppointmentId}/status`)
+          .set('Authorization', `Bearer ${doctorToken}`)
+          .send({ status: 'completed', outcome_notes: 'Patient responded well to treatment.' });
+        expect(res.statusCode).toBe(200);
+
+        const row = await pool.query('SELECT outcome_notes, completed_at FROM appointments WHERE id = $1', [throwawayAppointmentId]);
+        expect(row.rows[0].outcome_notes).toBe('Patient responded well to treatment.');
+        expect(row.rows[0].completed_at).not.toBeNull();
+      });
+
+      it('does not move completed_at forward on a repeat completion', async () => {
+        if (!throwawayAppointmentId) return;
+
+        const before = await pool.query('SELECT completed_at FROM appointments WHERE id = $1', [throwawayAppointmentId]);
+
+        const res = await request(app)
+          .put(`/api/doctor/appointments/${throwawayAppointmentId}/status`)
+          .set('Authorization', `Bearer ${doctorToken}`)
+          .send({ status: 'completed', outcome_notes: 'Follow-up note added.' });
+        expect(res.statusCode).toBe(200);
+
+        const after = await pool.query('SELECT outcome_notes, completed_at FROM appointments WHERE id = $1', [throwawayAppointmentId]);
+        expect(after.rows[0].completed_at.getTime()).toBe(before.rows[0].completed_at.getTime());
+        expect(after.rows[0].outcome_notes).toBe('Follow-up note added.');
+      });
+
+      it('surfaces outcome_notes on the patient consultation-history timeline', async () => {
+        if (!throwawayAppointmentId) return;
+
+        const patientRow = await pool.query(
+          "SELECT p.id FROM patients p JOIN users u ON u.id = p.user_id WHERE u.email = 'jane@helixacare.com'"
+        );
+        const patientId = patientRow.rows[0]?.id;
+
+        const res = await request(app)
+          .get(`/api/consultation-history/patient/${patientId}?type=appointment&limit=50`)
+          .set('Authorization', `Bearer ${doctorToken}`);
+        expect(res.statusCode).toBe(200);
+
+        const entry = res.body.data.find((e) => e.id === throwawayAppointmentId);
+        expect(entry).toBeDefined();
+        expect(entry.details.outcome_notes).toBe('Follow-up note added.');
+      });
+    });
+
+    describe('generic status/reschedule endpoints reject follow-up rows', () => {
+      let followUpId;
+
+      beforeAll(async () => {
+        const patientRow = await pool.query(
+          "SELECT p.id FROM patients p JOIN users u ON u.id = p.user_id WHERE u.email = 'jane@helixacare.com'"
+        );
+        const future = new Date();
+        future.setDate(future.getDate() + 40);
+        const res = await request(app)
+          .post('/api/follow-ups')
+          .set('Authorization', `Bearer ${doctorToken}`)
+          .send({
+            patient_id: patientRow.rows[0]?.id,
+            scheduled_date: future.toISOString().split('T')[0],
+            notes: 'guard-test follow-up',
+          });
+        followUpId = res.body.id;
+      });
+
+      afterAll(async () => {
+        if (followUpId) await pool.query('DELETE FROM appointments WHERE id = $1', [followUpId]);
+      });
+
+      it('PUT /:id/status on a follow-up returns 400 pointing to the Follow-Ups page', async () => {
+        const res = await request(app)
+          .put(`/api/doctor/appointments/${followUpId}/status`)
+          .set('Authorization', `Bearer ${doctorToken}`)
+          .send({ status: 'completed' });
+        expect(res.statusCode).toBe(400);
+        expect(res.body.error).toMatch(/Follow-Ups page/);
+      });
+
+      it('PUT /:id/reschedule on a follow-up returns 400 pointing to the Follow-Ups page', async () => {
+        const res = await request(app)
+          .put(`/api/doctor/appointments/${followUpId}/reschedule`)
+          .set('Authorization', `Bearer ${doctorToken}`)
+          .send({ appointment_date: '2027-01-01' });
+        expect(res.statusCode).toBe(400);
+        expect(res.body.error).toMatch(/Follow-Ups page/);
+      });
     });
   });
 

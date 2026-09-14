@@ -46,4 +46,49 @@ describe('Appointments Integration Tests', () => {
     expect(res.body).toHaveProperty('id'); // Ensure the created appointment has an ID
     createdId = res.body.id;
   });
+
+  describe('/api/admin/appointments generic endpoints reject follow-up rows', () => {
+    let followUpId, otherDoctorId;
+
+    beforeAll(async () => {
+      const dRow = await pool.query(
+        "SELECT d.id FROM doctors d JOIN users u ON u.id = d.user_id WHERE u.email = 'palmer@helixacare.com'"
+      );
+      otherDoctorId = dRow.rows[0]?.id;
+
+      const future = new Date();
+      future.setDate(future.getDate() + 45);
+      const res = await request(app)
+        .post('/api/follow-ups')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          patient_id: 1,
+          scheduled_date: future.toISOString().split('T')[0],
+          notes: 'admin guard-test follow-up',
+        });
+      followUpId = res.body.id;
+    });
+
+    afterAll(async () => {
+      if (followUpId) await pool.query('DELETE FROM appointments WHERE id = $1', [followUpId]);
+    });
+
+    it('PATCH /:id on a follow-up returns 400 pointing to the Follow-Ups page', async () => {
+      const res = await request(app)
+        .patch(`/api/admin/appointments/${followUpId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ status: 'completed' });
+      expect(res.statusCode).toBe(400);
+      expect(res.body.error).toMatch(/Follow-Ups page/);
+    });
+
+    it('PUT /:id/reassign on a follow-up returns 400 pointing to the Follow-Ups page', async () => {
+      const res = await request(app)
+        .put(`/api/admin/appointments/${followUpId}/reassign`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ doctor_id: otherDoctorId });
+      expect(res.statusCode).toBe(400);
+      expect(res.body.error).toMatch(/Follow-Ups page/);
+    });
+  });
 });

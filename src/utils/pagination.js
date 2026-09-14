@@ -40,6 +40,7 @@ const VALID_SORT_COLUMNS = {
   conversations: ['id', 'title', 'is_group', 'created_by', 'created_at', 'updated_at'],
   conversation_participants: ['id', 'conversation_id', 'user_id', 'joined_at', 'last_read_at', 'is_pinned'],
   question_assignments: ['id', 'question_id', 'patient_id', 'doctor_id', 'response_id', 'assigned_at'],
+  patient_health_programs: ['id', 'patient_id', 'health_program_id', 'enrolled_at'],
 };
 
 module.exports = async function paginate({

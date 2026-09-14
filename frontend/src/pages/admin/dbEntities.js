@@ -318,6 +318,14 @@ export const ENTITIES = [
     ],
   },
   {
+    key: 'patient-health-programs',
+    label: 'Patient Health Programs',
+    fields: [
+      num('patient_id', 'Patient ID'),
+      num('health_program_id', 'Health Program ID'),
+    ],
+  },
+  {
     key: 'health-logs',
     label: 'Health Logs',
     fields: [

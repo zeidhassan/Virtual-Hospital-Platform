@@ -64,6 +64,12 @@ export const sendAdminAppointmentReminder = (id) =>
 export const getAllDoctors = (params = {}) =>
   apiClient.get('/admin/doctor-time-slots', { params: { list_only: true, limit: 200, ...params } });
 
+// Patient list (for follow-up create/filter pickers) — reuses the existing,
+// already admin-gated database-admin-board route, which already returns
+// full_name per row.
+export const getAllPatientsForPicker = (params = {}) =>
+  apiClient.get('/adminBoard/patients', { params: { limit: 500, sort: '+id', ...params } });
+
 // Doctor subscriptions
 export const getDoctorSubscriptions = (params = {}) =>
   apiClient.get('/adminBoard/doctor-subscriptions', { params });

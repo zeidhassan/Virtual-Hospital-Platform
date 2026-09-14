@@ -105,6 +105,75 @@ describe('Follow-Up API (Section 7.1–7.8)', () => {
     expect(res.body.status).toBe('completed');
   });
 
+  // Outcome-notes capture on follow-up completion (doctor-only clinical field)
+  describe('outcome_notes on follow-up completion', () => {
+    let outcomeFollowUpId;
+
+    beforeAll(async () => {
+      const future = new Date();
+      future.setDate(future.getDate() + 12);
+      const res = await request(app)
+        .post('/api/follow-ups')
+        .set('Authorization', `Bearer ${doctorToken}`)
+        .send({
+          patient_id: patientId,
+          doctor_id: doctorId,
+          scheduled_date: future.toISOString().split('T')[0],
+          notes: 'test follow-up for outcome notes',
+        });
+      outcomeFollowUpId = res.body.id;
+    });
+
+    it('doctor can complete with outcome_notes, and completed_at stays stable on repeat', async () => {
+      const res = await request(app)
+        .put(`/api/follow-ups/${outcomeFollowUpId}/complete`)
+        .set('Authorization', `Bearer ${doctorToken}`)
+        .send({ outcome_notes: 'Patient recovering well.' });
+      expect(res.statusCode).toBe(200);
+      expect(res.body.outcome_notes).toBe('Patient recovering well.');
+      const firstCompletedAt = res.body.completed_at;
+
+      const res2 = await request(app)
+        .put(`/api/follow-ups/${outcomeFollowUpId}/complete`)
+        .set('Authorization', `Bearer ${doctorToken}`)
+        .send({ outcome_notes: 'Updated note.' });
+      expect(res2.statusCode).toBe(200);
+      expect(res2.body.outcome_notes).toBe('Updated note.');
+      expect(res2.body.completed_at).toBe(firstCompletedAt);
+    });
+
+    it('surfaces outcome_notes on the patient consultation-history timeline', async () => {
+      const res = await request(app)
+        .get(`/api/consultation-history/patient/${patientId}?type=follow_up&limit=50`)
+        .set('Authorization', `Bearer ${doctorToken}`);
+      expect(res.statusCode).toBe(200);
+      const entry = res.body.data.find((e) => e.id === outcomeFollowUpId);
+      expect(entry).toBeDefined();
+      expect(entry.details.outcome_notes).toBe('Updated note.');
+    });
+
+    it('a patient completing a follow-up cannot write outcome_notes', async () => {
+      const future = new Date();
+      future.setDate(future.getDate() + 13);
+      const created = await request(app)
+        .post('/api/follow-ups')
+        .set('Authorization', `Bearer ${doctorToken}`)
+        .send({
+          patient_id: patientId,
+          doctor_id: doctorId,
+          scheduled_date: future.toISOString().split('T')[0],
+          notes: 'test follow-up patient-complete guard',
+        });
+
+      const res = await request(app)
+        .put(`/api/follow-ups/${created.body.id}/complete`)
+        .set('Authorization', `Bearer ${patientToken}`)
+        .send({ outcome_notes: 'a patient trying to write clinical notes' });
+      expect(res.statusCode).toBe(200);
+      expect(res.body.outcome_notes).toBeNull();
+    });
+  });
+
   // Create a new pending follow-up for cancel test
   let cancelId;
   it('setup — create second follow-up for cancel test', async () => {
@@ -283,5 +352,119 @@ describe('Follow-Up API (Section 7.1–7.8)', () => {
   it('unauthenticated request returns 401', async () => {
     const res = await request(app).get('/api/follow-ups/admin');
     expect(res.statusCode).toBe(401);
+  });
+
+  // Regression guard: paginate() used to route numeric filter values through
+  // a LOWER(...) LIKE comparison, which throws against an integer column.
+  it('admin filtering by patient_id never 500s', async () => {
+    const res = await request(app)
+      .get(`/api/follow-ups/admin?patient_id=${patientId}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect([200, 400]).toContain(res.statusCode);
+    expect(res.statusCode).not.toBe(500);
+    if (res.statusCode === 200) {
+      res.body.data.forEach((fu) => expect(fu.patient_id).toBe(patientId));
+    }
+  });
+
+  it('admin filtering by a non-numeric patient_id returns 400, not 500', async () => {
+    const res = await request(app)
+      .get('/api/follow-ups/admin?patient_id=not-a-number')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(res.statusCode).toBe(400);
+  });
+
+  // Assign into a conflicting slot must surface needsReschedule so the UI
+  // can offer the doctor's real available slots instead of a dead end.
+  it('assigning into a conflicting slot returns 400 with needsReschedule', async () => {
+    // Book Dr. Strange solid on a Monday slot he's declared (09:00-09:30),
+    // then create an unassigned follow-up on that same date/time and try
+    // to assign him to it.
+    const monday = new Date();
+    monday.setDate(monday.getDate() + ((1 + 7 - monday.getDay()) % 7 || 7)); // next Monday
+    const dateString = monday.toISOString().split('T')[0];
+
+    const blocker = await request(app)
+      .post('/api/follow-ups')
+      .set('Authorization', `Bearer ${doctorToken}`)
+      .send({
+        patient_id: patientId,
+        scheduled_date: dateString,
+        appointment_start_time: '09:00',
+        appointment_end_time: '09:30',
+        notes: 'test follow-up conflict blocker',
+      });
+    expect(blocker.statusCode).toBe(201);
+
+    const target = await request(app)
+      .post('/api/follow-ups')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        patient_id: patientId,
+        scheduled_date: dateString,
+        appointment_start_time: '09:00',
+        appointment_end_time: '09:30',
+        notes: 'test follow-up assign target',
+      });
+    expect(target.statusCode).toBe(201);
+    expect(target.body.doctor_id).toBeNull();
+
+    const res = await request(app)
+      .put(`/api/follow-ups/${target.body.id}/assign`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ doctor_id: doctorId });
+    expect(res.statusCode).toBe(400);
+    expect(res.body.needsReschedule).toBe(true);
+  });
+
+  // Doctor-create ownership check: a doctor may only schedule a follow-up
+  // for a patient they've actually treated.
+  describe('doctor-create ownership check', () => {
+    let secondDoctorToken;
+    let linkedPatientId, unlinkedPatientId, secondDoctorId;
+
+    beforeAll(async () => {
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'palmer@helixacare.com', password: 'admin123' });
+      secondDoctorToken = loginRes.body.token;
+
+      const dRow = await pool.query(
+        "SELECT d.id FROM doctors d JOIN users u ON u.id = d.user_id WHERE u.email = 'palmer@helixacare.com'"
+      );
+      secondDoctorId = dRow.rows[0]?.id;
+
+      const linked = await pool.query(
+        'SELECT DISTINCT patient_id FROM appointments WHERE doctor_id = $1 LIMIT 1',
+        [secondDoctorId]
+      );
+      linkedPatientId = linked.rows[0]?.patient_id;
+
+      const unlinked = await pool.query(
+        `SELECT id FROM patients
+         WHERE id != ALL(SELECT DISTINCT patient_id FROM appointments WHERE doctor_id = $1)
+         LIMIT 1`,
+        [secondDoctorId]
+      );
+      unlinkedPatientId = unlinked.rows[0]?.id;
+    });
+
+    it('doctor creating a follow-up for an unlinked patient returns 403', async () => {
+      if (!unlinkedPatientId) return; // no unlinked patient in this dataset — nothing to assert
+      const res = await request(app)
+        .post('/api/follow-ups')
+        .set('Authorization', `Bearer ${secondDoctorToken}`)
+        .send({ patient_id: unlinkedPatientId, scheduled_date: '2026-06-01', notes: 'test follow-up unlinked' });
+      expect(res.statusCode).toBe(403);
+    });
+
+    it('doctor creating a follow-up for a linked patient returns 201', async () => {
+      if (!linkedPatientId) return;
+      const res = await request(app)
+        .post('/api/follow-ups')
+        .set('Authorization', `Bearer ${secondDoctorToken}`)
+        .send({ patient_id: linkedPatientId, scheduled_date: '2026-06-02', notes: 'test follow-up linked' });
+      expect(res.statusCode).toBe(201);
+    });
   });
 });

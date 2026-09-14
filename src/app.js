@@ -129,6 +129,7 @@ app.use('/api/adminBoard/support-tickets', require('./routes/databaseAdminBoard/
 app.use('/api/adminBoard/support-ticket-replies', require('./routes/databaseAdminBoard/supportTicketReplies')); // NEW 
 app.use('/api/adminBoard/services', require('./routes/databaseAdminBoard/services'));
 app.use('/api/adminBoard/health-programs', require('./routes/databaseAdminBoard/healthPrograms.js')); // MODIFIED API NAME (programs -> health-programs)
+app.use('/api/adminBoard/patient-health-programs', require('./routes/databaseAdminBoard/patientHealthPrograms'));
 app.use('/api/adminBoard/health-logs', require('./routes/databaseAdminBoard/healthLogs'));
 app.use('/api/adminBoard/patient-insurance', require('./routes/databaseAdminBoard/patientInsurance'));
 app.use('/api/adminBoard/payment-methods', require('./routes/databaseAdminBoard/paymentMethods'));
@@ -146,7 +147,6 @@ app.use('/api/dashboard', require('./routes/dashboard/dashboard'));
 
 app.use('/api/profile', require('./routes/profile/profile'));  // NEW
 
-app.use('/api/admin', require('./routes/admin/admin'));
 app.use('/api/admin/appointments', require('./routes/admin/adminAppointments'));
 app.use('/api/admin/billing', require('./routes/admin/billing'));
 app.use('/api/admin/subscriptions', require('./routes/admin/subscriptions'));
@@ -193,6 +193,7 @@ app.use('/api/support-tickets', require('./routes/supportTickets/supportTickets'
 app.use('/api/triage', require('./routes/triage/triage'));
 
 app.use('/api/follow-ups', require('./routes/followUp/followUps'));
+app.use('/api/health-programs', require('./routes/healthPrograms/healthPrograms'));
 app.use('/api/health-logs', require('./routes/healthLogs/healthLogs'));
 app.use('/api/consultation-history', require('./routes/consultationHistory/consultationHistory'));
 

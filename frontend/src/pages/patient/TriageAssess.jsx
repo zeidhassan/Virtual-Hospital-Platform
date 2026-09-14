@@ -173,7 +173,7 @@ const TriageAssess = () => {
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Spinner size="lg" />
               <p className="text-sm font-semibold text-text-primary mt-4 mb-1">AVA is analyzing…</p>
-              <p className="text-xs text-text-muted">This will only take a moment</p>
+              <p className="text-xs text-text-muted">This can take up to a minute</p>
             </div>
           )}
 
@@ -258,7 +258,7 @@ const TriageAssess = () => {
                           <Badge variant={session.urgency_level === 'emergency' ? 'error' : session.urgency_level === 'urgent' ? 'warning' : session.urgency_level === 'standard' ? 'info' : 'success'}>{urgencyConfig?.label || session.urgency_level}</Badge>
                           <span className="text-xs text-text-muted">{session.created_at ? format(new Date(session.created_at), 'dd MMM yyyy, HH:mm') : '—'}</span>
                         </div>
-                        <p className="text-sm text-text-secondary line-clamp-2 mb-2">{session.symptoms}</p>
+                        <p className="text-sm text-text-secondary line-clamp-2 mb-2">{session.symptoms_text}</p>
                         <p className="text-xs text-text-muted">
                           <span className="font-semibold">Recommended:</span> {session.recommended_action}
                         </p>

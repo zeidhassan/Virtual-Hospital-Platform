@@ -39,6 +39,7 @@ export const statusVariant = (status) => {
     cancelled: 'danger',
     rejected: 'danger',
     failed: 'danger',
+    missed: 'danger',
     inactive: 'default',
   };
   return map[status?.toLowerCase()] || 'default';

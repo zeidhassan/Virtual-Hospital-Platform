@@ -55,13 +55,17 @@ exports.getAllDoctorTimeSlots = async (req, res) => {
     // -------- 3) All slots (with doctor names) --------
     const result = await paginate({
       table: 'doctor_time_slots dts',
-      // we’ll default to grouping by doctor name, so use users (u) for sorting
-      sortTable: 'u',
+      // sortTable only sets the SQL prefix — paginate()'s own column
+      // whitelist always validates against the *base* table
+      // (doctor_time_slots), never whatever sortTable points at, so a
+      // joined column like u.full_name can never pass validation here and
+      // this endpoint 500'd on every call with no explicit ?sort override.
+      // doctor_id gives the same "grouped by doctor" effect without that problem.
+      sortTable: 'dts',
       page: req.query.page || 1,
       limit: req.query.limit || 20,
-      // original had: ORDER BY u.full_name, CASE(day_of_week), start_time
-      // here we approximate with doctor name; add ?sort=+start_time if you prefer time-first
-      sort: req.query.sort || '+full_name',
+      // add ?sort=+start_time if you prefer time-first
+      sort: req.query.sort || '+doctor_id',
       select: `
         dts.id, dts.doctor_id, dts.day_of_week, dts.start_time, dts.end_time,
         u.full_name AS doctor_name

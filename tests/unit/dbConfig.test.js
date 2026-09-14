@@ -24,7 +24,7 @@ describe('DB Config', () => {
     const configSpy = jest.spyOn(dotenv, 'config');
 
     require('../../src/config/db');
-    expect(configSpy).toHaveBeenCalledWith({ path: path.resolve(process.cwd(), '.env.test') });
+    expect(configSpy).toHaveBeenCalledWith({ path: path.resolve(process.cwd(), '.env.test'), override: true });
   });
 
   test('should load .env when NODE_ENV not set', () => {
@@ -33,7 +33,7 @@ describe('DB Config', () => {
     const configSpy = jest.spyOn(dotenv, 'config');
 
     require('../../src/config/db');
-    expect(configSpy).toHaveBeenCalledWith({ path: path.resolve(process.cwd(), '.env') });
+    expect(configSpy).toHaveBeenCalledWith({ path: path.resolve(process.cwd(), '.env'), override: true });
   });
 
   test('should create pg Pool instance with correct config', () => {

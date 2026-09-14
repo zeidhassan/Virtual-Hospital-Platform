@@ -1,8 +1,11 @@
 import apiClient from './client';
 
 // Patient
+// AVA's classification now calls a local LLM (with a fast rule-based
+// fallback only if that's unreachable) — the happy path itself can take
+// several seconds, well past the client's default 15s timeout.
 export const assessTriage = (data) =>
-  apiClient.post('/triage/assess', data);
+  apiClient.post('/triage/assess', data, { timeout: 60000 });
 
 export const getTriageHistory = (params = {}) =>
   apiClient.get('/triage/history', { params });

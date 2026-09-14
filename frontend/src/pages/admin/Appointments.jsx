@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getAdminAppointments, updateAdminAppointment, deleteAdminAppointment, reassignAdminAppointment, getAllDoctors, sendAdminAppointmentReminder, getAdminAvailableTimeSlots } from '@/api/admin';
-import { processReminders, processMissed } from '@/api/followUps';
 import usePaginatedFetch from '@/hooks/usePaginatedFetch';
 import Card from '@/components/ui/Card';
 import Badge, { statusVariant } from '@/components/ui/Badge';
@@ -14,18 +14,19 @@ import PageHeader from '@/components/ui/PageHeader';
 import Pagination from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
 import Avatar from '@/components/ui/Avatar';
-import { CalendarCheck, Trash2, RefreshCw, Edit2, Search, Bell, AlertCircle, BellRing } from 'lucide-react';
+import { CalendarCheck, Trash2, RefreshCw, Edit2, Search, BellRing, ArrowUpRight } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
-const APPT_STATUSES = ['pending', 'confirmed', 'completed', 'cancelled', 'no_show'];
+const APPT_STATUSES = ['pending', 'confirmed', 'completed', 'cancelled', 'missed'];
 const STATUS_FILTERS = ['all', 'pending', 'confirmed', 'completed', 'cancelled'];
 const TYPE_FILTERS = ['all', 'consultation', 'follow_up', 'triage_escalation'];
 const TYPE_LABEL = { consultation: 'Consultation', follow_up: 'Follow-up', triage_escalation: 'Escalated' };
 const TYPE_VARIANT = { consultation: 'default', follow_up: 'brand', triage_escalation: 'warning' };
 
 const AdminAppointments = () => {
+  const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -71,7 +72,6 @@ const AdminAppointments = () => {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [slotsError, setSlotsError] = useState('');
 
-  const [processing, setProcessing] = useState(null);
   const [reminding, setReminding] = useState(null);
 
   const handleSendReminder = async (id) => {
@@ -88,32 +88,6 @@ const AdminAppointments = () => {
   };
 
   const canAct = (status) => status !== 'completed' && status !== 'cancelled';
-
-  const handleProcessReminders = async () => {
-    setProcessing('reminders');
-    try {
-      const { data: res } = await processReminders();
-      toast.success(`${res.count} reminder${res.count !== 1 ? 's' : ''} sent`);
-      refetch();
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed');
-    } finally {
-      setProcessing(null);
-    }
-  };
-
-  const handleProcessMissed = async () => {
-    setProcessing('missed');
-    try {
-      const { data: res } = await processMissed();
-      toast.success(`${res.count} follow-up${res.count !== 1 ? 's' : ''} marked as missed`);
-      refetch();
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed');
-    } finally {
-      setProcessing(null);
-    }
-  };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this appointment? This cannot be undone.')) return;
@@ -232,19 +206,7 @@ const AdminAppointments = () => {
 
   return (
     <div className="animate-fade-in space-y-6">
-      <PageHeader
-        title="Appointments Management"
-        action={
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" isLoading={processing === 'reminders'} onClick={handleProcessReminders} disabled={processing !== null}>
-              <Bell size={14} className="mr-1" /> Send Reminders
-            </Button>
-            <Button size="sm" variant="outline" isLoading={processing === 'missed'} onClick={handleProcessMissed} disabled={processing !== null}>
-              <AlertCircle size={14} className="mr-1" /> Process Missed
-            </Button>
-          </div>
-        }
-      />
+      <PageHeader title="Appointments Management" />
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -330,15 +292,29 @@ const AdminAppointments = () => {
                         <BellRing size={14} />
                       </Button>
                     )}
-                    {canAct(appt.status) && (
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(appt)} title="Reschedule / update status">
-                        <Edit2 size={14} />
-                      </Button>
-                    )}
-                    {canAct(appt.status) && (
-                      <Button variant="ghost" size="sm" onClick={() => openReassign(appt)} title={appt.doctor_name ? 'Reassign' : 'Assign'}>
-                        <RefreshCw size={14} />
-                      </Button>
+                    {/* Edit/Reassign act through generic endpoints the backend now
+                        rejects for follow-up rows (they have their own dedicated
+                        lifecycle with different side effects — see Follow-Ups
+                        page) — show a redirect instead of a button that 400s. */}
+                    {appt.appointment_type === 'follow_up' ? (
+                      canAct(appt.status) && (
+                        <Button variant="ghost" size="sm" onClick={() => navigate('/admin/follow-ups')} className="text-brand-600 hover:bg-brand-50" title="Manage this follow-up from the Follow-Ups page">
+                          <ArrowUpRight size={14} className="mr-1" /> Follow-Ups
+                        </Button>
+                      )
+                    ) : (
+                      <>
+                        {canAct(appt.status) && (
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(appt)} title="Reschedule / update status">
+                            <Edit2 size={14} />
+                          </Button>
+                        )}
+                        {canAct(appt.status) && (
+                          <Button variant="ghost" size="sm" onClick={() => openReassign(appt)} title={appt.doctor_name ? 'Reassign' : 'Assign'}>
+                            <RefreshCw size={14} />
+                          </Button>
+                        )}
+                      </>
                     )}
                     <Button variant="ghost" size="sm" onClick={() => handleDelete(appt.id)} disabled={deleting === appt.id} className="text-red-600 hover:text-red-700 hover:bg-red-50" title="Delete">
                       <Trash2 size={14} />

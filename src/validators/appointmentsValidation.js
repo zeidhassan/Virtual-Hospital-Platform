@@ -17,7 +17,29 @@ const validateCreateAppointment = [
 
 const validateUpdateAppointment = [...validateCreateAppointment];
 
+// Deliberately its own list, not spread from validateCreateAppointment —
+// this route only ever receives { status, outcome_notes }, not the full
+// appointment shape. outcome_notes must NOT use .escape() the way the
+// generic `notes` field above does: that HTML-entity-encodes apostrophes
+// (patient's -> patient&#x27;s), which is fine for form input but wrong for
+// clinical text meant to be read back; React already escapes on render.
+const validateUpdateAppointmentStatus = [
+  body('status').isIn(['pending', 'confirmed', 'completed', 'cancelled', 'missed']).withMessage('Invalid status value'),
+  body('outcome_notes').optional({ nullable: true }).isString().isLength({ max: 5000 }).withMessage('Outcome notes too long'),
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      // Every frontend caller reads err.response.data.error — the sibling
+      // validators above only return { errors: [...] }, which would surface
+      // here as a blank/generic toast.
+      return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
+    }
+    next();
+  }
+];
+
 module.exports = {
   validateCreateAppointment,
-  validateUpdateAppointment
+  validateUpdateAppointment,
+  validateUpdateAppointmentStatus
 };
